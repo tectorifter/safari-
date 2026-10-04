@@ -1,7 +1,7 @@
 {
   "id": "safari-plus",
   "name": "safari-plus",
-  "version": "1.0.8",
+  "version": "1.2.1",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",

@@ -3,8 +3,11 @@
 ## Seams
 
 - `src.core.game3.battle_bridge.start` (guard `Bridge.__spSafariWrapped`):
-- wild battles (`opts.wild`, non-link, tutorials and trainer parties
-- excluded) get `opts.safari = true`. Calls through.
+- wild battles (`opts.wild`, non-link, tutorials, trainer parties and
+- trainer ids excluded) run on a COPY of opts with `safari = true` —
+- the caller's table is never mutated, so a reused options table can
+- never leak safari mode into the next trainer battle and steal its
+- intro. Calls through.
 - `src.core.game3.battle.rules.safari.newStateRse` / `newState`
 - (guards `RS.__spRseWrapped` / `RS.__spNewWrapped`): battle ball stock
 - comes from the live session stock.
@@ -113,7 +116,61 @@
 - leaves and A throws. If the case is gone but the battle never
 - resumed (close callback lost), the wrap forces phase back to
 - `command` and reopens the menu, and the first pump error is
-- logged once per battle instead of swallowed.
+- logged once per battle instead of swallowed. The recovery only
+- fires if the case was actually seen open, so the no-case message
+- path (which never opens the case) is left alone.
+- `src.core.game3.battle.ui.askYesNo` (guard `Ui.__spCandyAskWrapped`):
+- the caught-mon nickname question is intercepted when the catch is a
+- duplicate (`CatchSeq.catchResult`, `firstTimeCaught == false`) while
+- the mod is on: it asks "You already have a copy of this POKéMON. /
+- Exchange it for an EXP CANDY?" first, reusing the
+- `catch_nickname_prompt` phase so choice input keeps working. No
+- falls back to the stock nickname prompt; Yes removes the caught mon
+- (party slot, or the deferred PC deposit which is then never made),
+- grants EXP CANDY items, pushes "Converted into ...!" and ends via
+- the stock `catch_pc_msg` pump. A full bag falls back to the nickname
+- prompt and keeps the mon. Tutorials, headless, and first-time catches
+- call through untouched. Installed at boot and retried on every
+- `battle.started`.
+- `ItemsData.info` (guard `ItemsData.__spCandyInfoWrapped`): ids
+- 9101-9105 report as EXP CANDY XS/S/M/L/XL (ITEMS pocket, "Gives N
+- Exp. Points."), so the stock bag stores and lists them with no pack
+- changes; all other ids call through.
+- `BagChrome.iconImage` (guard `BC.__spCandyIconWrapped`): candy ids
+- render with the Rare Candy icon (68), or a generated tier-colored
+- candy glyph when 68 has no cached art; all other ids call through.
+- `ItemUse.needsPartyTarget` (guard
+- `ItemUse.__spCandyTargetWrapped`): candies need a party target, so
+- USE opens the party picker and `useField` applies the candy XP;
+- other items call through.
+- Wraps install via `ensureWraps` at boot, on `battle.started`, and
+- on every wrapped `info`/`askYesNo` call until all succeed, so a
+- lazily-loaded bag/item module cannot leave icons or candy use
+- uninstalled in the overworld.
+- `BagChrome.drawItemIcon` (guard `BC.__spCandyTintWrapped`): candy
+- icons draw tinted yellow (XS), green (S), deep blue (M), dark pink
+- (L), shiny red (XL), falling back to the stock draw without love;
+- all other ids call through. The Emerald RSE chrome
+- (`src.ui.game3.rse.bag_chrome`, a separate atlas-indexed module)
+- is wrapped too: candies draw the Rare Candy frame (68) tinted,
+- falling back to plain 68 without love.
+- `src.core.game3.item_use.useField` (guard
+- `ItemUse.__spCandyUseWrapped`): using a candy from the party menu
+- applies its XP via `Experience.apply` (100/800/3000/10000/30000),
+- consumes one, and reports "gained N EXP. Points!" plus the new level.
+- Lv 100, fainted, and egg targets are refused; other items call
+- through. Move-learning and evolution on candy level-ups are not
+- queued yet.
+- Duplicate rewards by caught level (ties go to the higher tier):
+- 1-5: 1 XS; 6-8: 2 XS; 9-10: 3 XS; 11-15: 1 S; 16-20: 2 S;
+- 21-29: 3 S; 30-35: 1 M; 36-40: 1 M + 1 S; 41-45: 1 L; 46+: 1 L
+- + 1 M. Final-stage pseudo-legendaries (Dragonite, Tyranitar,
+- Salamence, Metagross, by id or name) give 1 XL instead of level
+- rewards, so Dratini/Dragonair still use the level table; listed
+- legendaries/mythicals (Articuno, Zapdos, Moltres, Mew, Mewtwo,
+- Raikou, Entei, Suicune, Lugia, Ho-Oh, Celebi, Regirock, Regice,
+- Registeel, Latias, Latios, Kyogre, Groudon, Rayquaza, Jirachi,
+- Deoxys incl. forms) give 1 XL + 1 L.
 
 ## Events
 

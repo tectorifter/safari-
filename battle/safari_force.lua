@@ -7,6 +7,7 @@ return function(mod)
     Bridge.__spSafariWrapped = true
     local nativeStart = Bridge.start
     Bridge.start = function(mArg, game, foe, opts)
+      local useOpts = opts
       pcall(function()
         if SP.on() and type(opts) == "table" and opts.wild and not opts.link then
           local skip = opts.tutorial == true
@@ -14,14 +15,21 @@ return function(mod)
             skip = (foe.oldMan or foe.pokedude or foe.tutorial) and true or false
             if not skip and type(foe.party) == "table" then skip = true end
           end
+          if not skip and (opts.trainerId ~= nil
+              or (type(foe) == "table" and foe.trainerId ~= nil)) then
+            skip = true
+          end
           if not skip then
-            opts.safari = true
+            local copy = {}
+            for k, v in pairs(opts) do copy[k] = v end
+            copy.safari = true
+            useOpts = copy
             SP.tick()
             SP.ensureStock()
           end
         end
       end)
-      return nativeStart(mArg, game, foe, opts)
+      return nativeStart(mArg, game, foe, useOpts)
     end
   end
   if mod.events and type(mod.events.on) == "function" then

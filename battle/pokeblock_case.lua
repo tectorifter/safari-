@@ -257,6 +257,7 @@ return function(mod)
     return nil
   end
   local caseErrLogged = false
+  local sawCase = false
   local function noteErr(where, err)
     if caseErrLogged then return end
     caseErrLogged = true
@@ -276,11 +277,15 @@ return function(mod)
       local r = native(dt, game, ...)
       local ok, err = pcall(function()
         if not SP.on() then return end
-        if B._phase ~= "safari_pokeblock" then return end
+        if B._phase ~= "safari_pokeblock" then
+          sawCase = false
+          return
+        end
         local Case = caseModule()
         local open = Case and type(Case.isOpen) == "function"
           and Case.isOpen() or false
         if open then
+          sawCase = true
           local input = game and game.input
           if input ~= nil then
             if type(Case.handleInput) == "function" then
@@ -290,6 +295,8 @@ return function(mod)
           end
           return
         end
+        if not sawCase then return end
+        sawCase = false
         local st = battleState()
         if st and not st.over then
           B._phase = "command"
@@ -309,6 +316,7 @@ return function(mod)
   if mod.events and type(mod.events.on) == "function" then
     mod.events:on("battle.started", function()
       caseErrLogged = false
+      sawCase = false
       pcall(wrapRse)
       pcall(wrapBattle)
     end)
