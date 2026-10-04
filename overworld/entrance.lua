@@ -80,13 +80,20 @@ return function(mod)
     if ex == rec.nx and ey == rec.ny then return true end
     return placeOne(lid, rec.nx, rec.ny)
   end
-  local function restoreGuards()
+  local function restoreGuards(map)
     if next(movedGuards) == nil then return end
-    pcall(function()
-      for lid, rec in pairs(movedGuards) do
-        pcall(placeOne, lid, rec.ox, rec.oy)
-      end
-    end)
+    local m = map
+    if m == nil then
+      local s = SP.session()
+      m = s and s.map
+    end
+    if isSouthMap(m) then
+      pcall(function()
+        for lid, rec in pairs(movedGuards) do
+          pcall(placeOne, lid, rec.ox, rec.oy)
+        end
+      end)
+    end
     movedGuards = {}
   end
   local function clearDoorGuards(forceMap)
@@ -94,7 +101,7 @@ return function(mod)
     local s = SP.session()
     local m = forceMap or (s and s.map)
     if m == nil then return end
-    if not isSouthMap(m) then restoreGuards() return end
+    if not isSouthMap(m) then restoreGuards(m) return end
     pcall(function()
       local Objects = require("src.core.game3.objects")
       if not (Objects and type(Objects.listActive) == "function"
@@ -251,6 +258,9 @@ return function(mod)
       else
         pcall(clearDoorGuards)
       end
+    end)
+    mod.events:on("mod.options_changed", function()
+      pcall(clearDoorGuards)
     end)
   end
   mod.log:info("safari-plus: exit-door guard relocated")

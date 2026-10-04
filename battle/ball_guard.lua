@@ -1,17 +1,12 @@
 return function(mod)
   local SP = mod.exports.safariPlus
   if not SP then return end
-  local function isTutorial(st)
-    if st.oldManTutorial or st.pokedude then return true end
-    if st.kinds and st.kinds.tutorial == "wally" then return true end
-    return false
-  end
   local function isZero(st)
     if not SP.on() then return false end
     if type(st) ~= "table" then return false end
     if not st.safari then return false end
     if type(st.safariState) ~= "table" then return false end
-    if isTutorial(st) then return false end
+    if SP.isTutorial(st) then return false end
     if st.over then return false end
     return (tonumber(st.safariState.balls) or 0) <= 0
   end
@@ -68,7 +63,7 @@ return function(mod)
         if not SP.on() then return end
         if type(st) ~= "table" or not st.safari then return end
         if type(st.safariState) ~= "table" then return end
-        if isTutorial(st) then return end
+        if SP.isTutorial(st) then return end
         if (tonumber(st.safariState.balls) or 0) <= 0 then blocked = true end
       end)
       if blocked then return false, 0 end

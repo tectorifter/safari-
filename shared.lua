@@ -239,6 +239,17 @@ return function(mod)
     end
     return false
   end
+  function M.isTutorial(st)
+    if type(st) ~= "table" then return false end
+    if st.oldManTutorial or st.pokedude then return true end
+    if st.kinds and st.kinds.tutorial == "wally" then return true end
+    local okW, Wally = pcall(require, "src.core.game3.battle.tutorial_wally")
+    if okW and Wally and type(Wally.active) == "function" then
+      local ok, v = pcall(Wally.active, st)
+      if ok and v then return true end
+    end
+    return false
+  end
   function M.freeze()
     local s = M.session()
     if not s then return end
@@ -269,7 +280,6 @@ return function(mod)
     local cap = M.cap()
     if cleanNum(s.safari.balls, 0, cap, 0) >= cap then
       s.safariRegenAt = now
-      M.persist()
       return
     end
     local last = tonumber(s.safariRegenAt) or now

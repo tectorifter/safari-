@@ -38,20 +38,11 @@ return function(mod)
     end
     return idx
   end
-  local function isTutorial(st)
-    if st.oldManTutorial or st.pokedude then return true end
-    local okW, Wally = pcall(require, "src.core.game3.battle.tutorial_wally")
-    if okW and Wally and type(Wally.active) == "function" then
-      local ok, v = pcall(Wally.active, st)
-      if ok and v then return true end
-    end
-    return false
-  end
   local function ours(st)
     if not SP.on() then return false end
     if type(st) ~= "table" or not st.safari then return false end
     if type(st.enemy) ~= "table" then return false end
-    if isTutorial(st) then return false end
+    if SP.isTutorial(st) then return false end
     return true
   end
   local okC, Catching = pcall(require, "src.core.game3.battle.catching")

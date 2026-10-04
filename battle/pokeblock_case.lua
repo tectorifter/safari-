@@ -18,115 +18,15 @@ return function(mod)
     end
     return session or SP.session(), cb
   end
-  local CASE_NUM = 260
-  local CASE_NAMES = { "ITEM_POKEBLOCK_CASE", "POKEBLOCK_CASE" }
-  local function itemsData()
-    local okI, ItemsData = pcall(require, "src.core.game3.items_data")
-    if not okI or type(ItemsData) ~= "table" then return nil end
-    pcall(function()
-      if type(ItemsData.ensureLoaded) == "function" then
-        ItemsData.ensureLoaded()
-      end
-    end)
-    return ItemsData
-  end
-  local function caseIds(ItemsData)
-    local ids = { CASE_NUM, tostring(CASE_NUM) }
-    for _, n in ipairs(CASE_NAMES) do
-      ids[#ids + 1] = n
-    end
-    if ItemsData then
-      if type(ItemsData.toNumericId) == "function" then
-        for _, n in ipairs(CASE_NAMES) do
-          local num = nil
-          pcall(function() num = ItemsData.toNumericId(n) end)
-          if num ~= nil then ids[#ids + 1] = num end
-        end
-      end
-      if type(ItemsData.bagKey) == "function" then
-        for _, v in ipairs({ CASE_NUM, CASE_NAMES[1], CASE_NAMES[2] }) do
-          local k = nil
-          pcall(function() k = ItemsData.bagKey(v) end)
-          if k ~= nil then ids[#ids + 1] = k end
-        end
-      end
-    end
-    return ids
-  end
-  local function entryIds(entry)
-    if type(entry) ~= "table" then return { entry } end
-    return {
-      entry.id, entry.itemId, entry.item, entry[1],
-      entry.key, entry.name,
-    }
-  end
-  local function entryQty(entry)
-    if type(entry) ~= "table" then return tonumber(entry) or 1 end
-    local q = entry.qty
-    if q == nil then q = entry.quantity end
-    if q == nil then q = entry.count end
-    if q == nil then q = entry[2] end
-    if q == nil then return 1 end
-    return tonumber(q) or 0
-  end
-  local function idMatches(slotId, ids, ItemsData)
-    if slotId == nil then return false end
-    for _, want in ipairs(ids) do
-      if slotId == want or tostring(slotId) == tostring(want) then
-        return true
-      end
-    end
-    if tonumber(slotId) == CASE_NUM then return true end
-    if ItemsData then
-      local got = nil
-      if type(ItemsData.toNumericId) == "function" then
-        pcall(function() got = ItemsData.toNumericId(slotId) end)
-      end
-      if got ~= nil then
-        if got == CASE_NUM or tostring(got) == tostring(CASE_NUM) then
-          return true
-        end
-        for _, want in ipairs(ids) do
-          if got == want or tostring(got) == tostring(want) then
-            return true
-          end
-        end
-      end
-      if type(ItemsData.bagKey) == "function" then
-        local gk = nil
-        pcall(function() gk = ItemsData.bagKey(slotId) end)
-        if gk ~= nil then
-          for _, want in ipairs(ids) do
-            if gk == want or gk == tostring(want) then return true end
-          end
-        end
-      end
-    end
-    return false
-  end
-  local function listHas(list, ids, ItemsData)
-    if type(list) ~= "table" then return false end
-    for _, entry in pairs(list) do
-      if entryQty(entry) > 0 then
-        for _, id in ipairs(entryIds(entry)) do
-          if idMatches(id, ids, ItemsData) then return true end
-        end
-      end
-    end
-    return false
-  end
   local CASE_FLAG = 0x5F
   local function hasCase(session)
     if type(session) ~= "table" then return true end
     local flagged = false
     pcall(function()
       local f = session.flags
-      if type(f) == "table" then
-        if f[CASE_FLAG] == true or f[95] == true
-            or f["95"] == true or f["0x5F"] == true then
-          flagged = true
-          return
-        end
+      if type(f) == "table" and f[CASE_FLAG] == true then
+        flagged = true
+        return
       end
       local Space = package.loaded["src.core.game3.scripting.space"]
       if Space and Space.store then
@@ -138,82 +38,7 @@ return function(mod)
         end
       end
     end)
-    if flagged then return true end
-    local ItemsData = itemsData()
-    local ids = caseIds(ItemsData)
-    local bag = session.bag
-    if type(bag) == "table" then
-      local okB, Bag = pcall(require, "src.core.game3.bag")
-      if okB and Bag and type(Bag.has) == "function" then
-        for _, want in ipairs(ids) do
-          local ok, has = pcall(Bag.has, bag, want, 1)
-          if ok and has == true then return true end
-        end
-      end
-      local found = false
-      pcall(function()
-        if type(bag.pockets) == "table" then
-          for _, slots in pairs(bag.pockets) do
-            if type(slots) == "table" then
-              if listHas(slots, ids, ItemsData) then
-                found = true
-                return
-              end
-            end
-          end
-        end
-        if not found and type(bag.stacks) == "table" then
-          for k, qty in pairs(bag.stacks) do
-            if (tonumber(qty) or 0) > 0 and idMatches(k, ids, ItemsData) then
-              found = true
-              return
-            end
-          end
-        end
-        if not found then
-          for _, field in ipairs({ "keyItems", "key_items", "items",
-              "key", "inventory" }) do
-            if listHas(bag[field], ids, ItemsData) then
-              found = true
-              return
-            end
-          end
-        end
-      end)
-      if found then return true end
-    end
-    local found = false
-    pcall(function()
-      for _, field in ipairs({ "keyItems", "key_items", "items",
-          "inventory", "keyitems" }) do
-        if listHas(session[field], ids, ItemsData) then
-          found = true
-          return
-        end
-      end
-      local prof = session.profile
-      if type(prof) == "table" and not found then
-        for _, field in ipairs({ "keyItems", "key_items", "items",
-            "inventory", "bag" }) do
-          local v = prof[field]
-          if type(v) == "table" then
-            if type(v.pockets) == "table" then
-              for _, slots in pairs(v.pockets) do
-                if listHas(slots, ids, ItemsData) then
-                  found = true
-                  return
-                end
-              end
-            elseif listHas(v, ids, ItemsData) then
-              found = true
-              return
-            end
-          end
-          if found then return end
-        end
-      end
-    end)
-    return found
+    return flagged
   end
 
   local function wrapRse()
@@ -321,5 +146,5 @@ return function(mod)
       pcall(wrapBattle)
     end)
   end
-  mod.log:info("safari-plus: pokeblock case gated on item 260")
+  mod.log:info("safari-plus: pokeblock case gated on flag 0x5F")
 end

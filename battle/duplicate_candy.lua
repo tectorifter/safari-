@@ -2,6 +2,13 @@ return function(mod)
   local SP = mod.exports.safariPlus
   if not SP then return end
   local ensureWraps, glyphFor, isGlyph, candyDef
+  local rseAtlasCache = nil
+  local function setTint(def)
+    love.graphics.setColor(def.tint[1], def.tint[2], def.tint[3], 1)
+  end
+  local function clearTint()
+    love.graphics.setColor(1, 1, 1, 1)
+  end
   local function rseTinted(BC, def, x, y)
     local painted = false
     pcall(function()
@@ -11,17 +18,23 @@ return function(mod)
       pcall(function() m = BC.manifest() end)
       local icons = m and m.icons
       if not icons then return end
-      local okK, Kit = pcall(require, "src.ui.game3.rse.scene_kit")
-      if not (okK and Kit and type(Kit.rgbaImage) == "function") then return end
-      local img = Kit.rgbaImage(icons.rgba, icons.w, icons.h)
-      if img == nil then return end
-      local sw, sh = img:getDimensions()
-      if not (sw and sh) then return end
-      local q = lv.graphics.newQuad(0, 68 * 24, 24, 24, sw, sh)
-      if q == nil then return end
-      lv.graphics.setColor(def.tint[1], def.tint[2], def.tint[3], 1)
-      lv.graphics.draw(img, q, x, y)
-      lv.graphics.setColor(1, 1, 1, 1)
+      local c = rseAtlasCache
+      if not (c and c.icons == icons and c.img ~= nil and c.q ~= nil) then
+        c = nil
+        local okK, Kit = pcall(require, "src.ui.game3.rse.scene_kit")
+        if not (okK and Kit and type(Kit.rgbaImage) == "function") then return end
+        local img = Kit.rgbaImage(icons.rgba, icons.w, icons.h)
+        if img == nil then return end
+        local sw, sh = img:getDimensions()
+        if not (sw and sh) then return end
+        local q = lv.graphics.newQuad(0, 68 * 24, 24, 24, sw, sh)
+        if q == nil then return end
+        c = { icons = icons, img = img, q = q }
+        rseAtlasCache = c
+      end
+      setTint(def)
+      lv.graphics.draw(c.img, c.q, x, y)
+      clearTint()
       painted = true
     end)
     return painted
@@ -282,12 +295,12 @@ return function(mod)
         if type(lv) ~= "table" or type(lv.graphics) ~= "table" then return end
         local s = tonumber(scale) or 1
         if isGlyph(def, img) then
-          lv.graphics.setColor(1, 1, 1, 1)
+          clearTint()
         else
-          lv.graphics.setColor(def.tint[1], def.tint[2], def.tint[3], 1)
+          setTint(def)
         end
         lv.graphics.draw(img, px or 0, py or 0, 0, s, s)
-        lv.graphics.setColor(1, 1, 1, 1)
+        clearTint()
         painted = true
       end)
       if painted then return true end
@@ -376,15 +389,6 @@ return function(mod)
     end
     return nil
   end
-  local function isTutorial(st)
-    if st.oldManTutorial or st.pokedude then return true end
-    local okW, Wally = pcall(require, "src.core.game3.battle.tutorial_wally")
-    if okW and Wally and type(Wally.active) == "function" then
-      local ok, v = pcall(Wally.active, st)
-      if ok and v then return true end
-    end
-    return false
-  end
   local function convertRes(B, Ui, res, mon, rewards)
     local session = nil
     pcall(function()
@@ -459,7 +463,7 @@ return function(mod)
         if B == nil or B._headless then return end
         if B._phase ~= "catch_nickname_prompt" then return end
         st = B._st
-        if type(st) ~= "table" or isTutorial(st) then return end
+        if type(st) ~= "table" or SP.isTutorial(st) then return end
         res = liveCatchRes()
         if type(res) ~= "table" or not res.success then return end
         if res.firstTimeCaught then return end

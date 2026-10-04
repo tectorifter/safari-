@@ -102,7 +102,7 @@
 - `Safari.__spMidWrapped`): skipped once the no-balls text converted
 - in the current battle; calls through otherwise.
 - `src.core.game3.rse.init.call` (guard `Rse.__spCaseWrapped`):
-- safari-battle `pokeblock.chooseForBattle` is gated on item 260 —
+- safari-battle `pokeblock.chooseForBattle` is gated on flag 0x5F —
 - without the POKéBLOCK CASE the battle shows "You don't have the
 - POKéBLOCK CASE yet." and returns to the safari menu instead of
 - opening the case screen; with the case it re-wires the call to

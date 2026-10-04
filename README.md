@@ -36,7 +36,7 @@ the current dynamic price); buying applies the level at once and
 never touches the bag.
 
 - `SAFARI UPG` (60): +0.35 catch rate inside the catch-factor formula
-- per level (max +6).
+- per level (max +21.0 total).
 - `LIKEABLE` (30): flee divisor (likeability) 1 + 0.1 per level, cap 4.
 - `BALL RECOVERY` (70): -100ms regen interval per level, floor
 - 1 ball per 5 seconds.
@@ -62,6 +62,9 @@ never touches the bag.
 - the safari out-of-balls pipeline.
 - `battle/factors.lua` — catch/escape factor bonuses; battle stock
 - from the live stock.
+- `battle/ball_guard.lua` — zero-ball battle end; live stock sync.
+- `battle/pokeblock_case.lua` — POKéBLOCK CASE gate on flag 0x5F.
+- `battle/duplicate_candy.lua` — duplicate catches convert to EXP CANDY.
 - `overworld/shop.lua` — Oldale shelf, dynamic pricing, purchase
 - conversion via `Bag.add`/`Bag.canAdd` wraps.
 - `overworld/bag_balls.lua` — permanent virtual SAFARI BALL bag slot
