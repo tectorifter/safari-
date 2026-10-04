@@ -6,7 +6,7 @@ return {
     added = {
       "Wild encounters and fated (scripted/static) encounters open the native Emerald Safari scene instead of the normal combat scene. Trainer battles are untouched.",
       "Deep Safari Ball stock (10 base cap, +2 per BALL CAP level to 70) with wall-clock regen: one ball per interval, starting at 12 real seconds, upgrades shorten it to 5 seconds. Wall-clock time is immune to game speed. SAFARI BALL is always listed in the bag with the live count, even at 0.",
-      "Oldale mart sells four stacking upgrades with dynamic pricing (50 + 50 per owned level, starting at 50): SAFARI UPG (+0.1 catch rate inside the catch-factor formula per level, 60 levels), LIKEABLE (-0.1 escape factor per level, floor 0.1, 30 levels), BALL RECOVERY (-100ms regen interval per level, 70 levels), BALL CAP (+2 ball cap per level, 30 levels). Maxed lines leave the shelf.",
+      "Oldale mart sells four stacking upgrades with dynamic pricing (50 + 50 per owned level, starting at 50): SAFARI UPG (+0.35 catch rate inside the catch-factor formula per level, 60 levels), LIKEABLE (flee divisor 1 + 0.1 per level, cap 4, 30 levels), BALL RECOVERY (-100ms regen interval per level, 70 levels), BALL CAP (+2 ball cap per level, 30 levels). Maxed lines leave the shelf.",
       "Safari catches pay scaled EXP (EXP YIELD setting, default 50% of what the species would yield if defeated) to every alive sub-100 non-egg party mon through the normal in-battle presentation.",
       "The Hoenn Safari Zone entrance desk is disabled while the mod is on (everywhere is already safari): the entrance attendant simply doesn't respond, and specials 208/209 can't start the timed zone game or teleport you to the lobby — the zone is free-roam.",
     },

@@ -35,9 +35,9 @@ one level per purchase (quantity is forced to 1 so every level pays
 the current dynamic price); buying applies the level at once and
 never touches the bag.
 
-- `SAFARI UPG` (60): +0.1 catch rate inside the catch-factor formula
+- `SAFARI UPG` (60): +0.35 catch rate inside the catch-factor formula
 - per level (max +6).
-- `LIKEABLE` (30): -0.1 escape factor per level, floor 0.1.
+- `LIKEABLE` (30): flee divisor (likeability) 1 + 0.1 per level, cap 4.
 - `BALL RECOVERY` (70): -100ms regen interval per level, floor
 - 1 ball per 5 seconds.
 - `BALL CAP` (30): +2 ball cap per level, from 10 up to 70.

@@ -12,9 +12,31 @@
 - (guards `RS.__spRseWrapped` / `RS.__spNewWrapped`): battle ball stock
 - comes from the live session stock.
 - `Rules.safari.ballCatchRate` (guard `RS.__spRateWrapped`): adds
-- +0.1 per SAFARI UPG level (60 max).
-- `Rules.safari.fleeRate` (guard `RS.__spFleeWrapped`): escape factor
-- reduced 0.1 per LIKEABLE level, floor 0.1.
+- +0.35 per SAFARI UPG level (60 max, +21.0 total).
+- `Rules.safari.fleeRate` (guard `RS.__spFleeWrapped`): per-species
+- flee from BST as `((BST/100)/likeability)*5`, with likeability
+- `min(4, 1 + 0.1 per LIKEABLE level)` (30 max); falls back to the
+- old escape-factor math when the foe BST is unavailable.
+- `src.core.game3.battle.catching.tryCatch` (guard
+- `Catching.__spBallGuardWrapped`): a safari throw with no balls left
+- fails without rolling, so the stock out-of-balls flow ends the
+- battle instead of granting a free catch; tutorials, non-safari
+- battles, and the mod being off call through.
+- `src.core.game3.battle.ui.openMenu` (guard `Ui.__spZeroMenuWrapped`):
+- opening the safari menu with no balls left flees immediately via
+- the stock out-of-balls text instead of showing BALL, so the mon
+- runs before any throw can be chosen.
+- `src.core.game3.battle.ui.takeCommand` (guard
+- `Ui.__spZeroTakeWrapped`): a queued safari command with no balls
+- left is swallowed and flees the same way, so a BALL press in the
+- same frame never plays the throw; `Battle.update` (guard
+- `B.__spZeroUpdateWrapped`) re-checks on every command-phase entry
+- as the safety net for auto/headless turns. Tutorials, non-safari
+- battles, and the mod being off call through.
+- `Battle.safariSyncBalls` (guard `B.__spBallGuardSyncWrapped`):
+- after the engine syncs each throw, the live stock is forced to the
+- battle counter, so the bag mirror can never drift from it. Both
+- installed at boot and retried on every `battle.started`.
 - `src.core.game3.safari.takeStep` (guard `Safari.__spTakeStepWrapped`):
 - wall-clock regen tick, then zone steps are skipped while on; calls
 - through otherwise.

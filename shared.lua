@@ -170,17 +170,20 @@ return function(mod)
     return math.max(5, 12 - 0.1 * M.count("regen"))
   end
   function M.catchBonus()
-    return 0.1 * M.count("catch")
+    return 0.35 * M.count("catch")
   end
   function M.likeCut()
     return 0.1 * M.count("like")
   end
+  function M.likeValue()
+    return math.min(4, 1 + 0.1 * M.count("like"))
+  end
   function M.desc(key)
     local c = M.count(key)
     if key == "catch" then
-      return "Catch +" .. string.format("%.1f", 0.1 * c) .. " Lv" .. c .. "/60\nNext " .. M.price(key)
+      return "Catch +" .. string.format("%.1f", 0.35 * c) .. " Lv" .. c .. "/60\nNext " .. M.price(key)
     elseif key == "like" then
-      return "Flee -" .. string.format("%.1f", 0.1 * c) .. " Lv" .. c .. "/30\nNext " .. M.price(key)
+      return "Like x" .. string.format("%.1f", M.likeValue()) .. " Lv" .. c .. "/30\nNext " .. M.price(key)
     elseif key == "regen" then
       return "Ball/" .. string.format("%.1f", M.regenInterval()) .. "s Lv" .. c .. "/70\nNext " .. M.price(key)
     elseif key == "cap" then

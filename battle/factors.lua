@@ -44,13 +44,45 @@ return function(mod)
       return base
     end
   end
+  local function speciesBST()
+    local bst = nil
+    pcall(function()
+      local B = require("src.core.game3.battle")
+      local st = B and type(B.getState) == "function" and B.getState() or nil
+      local foe = type(st) == "table" and st.enemy or nil
+      if type(foe) ~= "table" then return end
+      local mon = foe.mon
+      local sid = tonumber(foe.species
+        or (type(mon) == "table" and (mon.species or mon.speciesId))
+        or foe.speciesId)
+      if sid == nil then return end
+      local Pokemon = require("src.core.game3.pokemon")
+      local tab = Pokemon and type(Pokemon.stats) == "function"
+        and Pokemon.stats(sid) or nil
+      if type(tab) ~= "table" then return end
+      local total = (tonumber(tab.hp) or 0) + (tonumber(tab.atk) or 0)
+        + (tonumber(tab.def) or 0) + (tonumber(tab.spe) or 0)
+        + (tonumber(tab.spa) or 0) + (tonumber(tab.spd) or 0)
+      if total > 0 then bst = total end
+    end)
+    return bst
+  end
   if type(RS.fleeRate) == "function" and not RS.__spFleeWrapped then
     RS.__spFleeWrapped = true
     local native = RS.fleeRate
     RS.fleeRate = function(sf, ...)
-      if SP.on() and type(sf) == "table" and sf.rse then
-        local eff = math.max(0.1, (tonumber(sf.escapeFactor) or 0) - SP.likeCut())
-        return eff * 5
+      if SP.on() then
+        local bst = speciesBST()
+        if bst ~= nil then
+          local like = tonumber(SP.likeValue()) or 1
+          if not (like > 0) then like = 1 end
+          return ((bst / 100) / like) * 5
+        end
+        if type(sf) == "table" and sf.rse then
+          local eff = math.max(0.1,
+            (tonumber(sf.escapeFactor) or 0) - SP.likeCut())
+          return eff * 5
+        end
       end
       local base = tonumber(native(sf, ...)) or 0
       if SP.on() then base = math.max(0.5, base - SP.likeCut() * 5) end
