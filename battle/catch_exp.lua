@@ -2,7 +2,9 @@ return function(mod)
   local SP = mod.exports.safariPlus
   if not SP then return end
   local paidFor = nil
-  local pendingMsg = nil
+  local pendingSt = nil
+  local gainedSum = 0
+  local gainedCount = 0
   local function alive(mon)
     return type(mon) == "table" and not mon.isEgg
       and (tonumber(mon.hp) or 0) > 0
@@ -52,21 +54,6 @@ return function(mod)
     if isTutorial(st) then return false end
     return true
   end
-  local function baseShare(E, st, idx)
-    local enemy = st.enemy
-    local fmon = enemy.mon
-    if type(fmon) ~= "table" then fmon = enemy end
-    local species = enemy.species or fmon.species or fmon.speciesId
-    if species == nil then return nil end
-    local level = math.max(1, tonumber(fmon.level)
-      or tonumber(enemy.level) or 1)
-    if type(E.expYield) ~= "function" then return nil end
-    local okY, y = pcall(E.expYield, species)
-    if not (okY and tonumber(y)) then return nil end
-    local calc = math.floor(tonumber(y) * level / 7)
-    if calc < 1 then return nil end
-    return math.max(1, math.floor(calc / #idx))
-  end
   local okC, Catching = pcall(require, "src.core.game3.battle.catching")
   if okC and Catching and type(Catching.storeCaught) == "function"
       and not Catching.__spCatchExpWrapped then
@@ -83,14 +70,9 @@ return function(mod)
         if not E then return end
         local idx = eligible(st.playerParty)
         if #idx == 0 then return end
+        gainedSum, gainedCount, pendingSt = 0, 0, st
         E.awardFoe(st, st.enemy, { trainer = false, partyIndices = idx })
         paidFor = st
-        local base = baseShare(E, st, idx)
-        if base then
-          local pct = 50
-          pcall(function() pct = SP.yieldPct() end)
-          pendingMsg = { st = st, base = math.max(0, math.floor(base * pct / 100)) }
-        end
       end)
       return res
     end
@@ -104,7 +86,12 @@ return function(mod)
         if not ours(b) then return amt end
         local pct = 50
         pcall(function() pct = SP.yieldPct() end)
-        return math.max(0, math.floor((tonumber(amt) or 0) * pct / 100))
+        local scaled = math.max(0, math.floor((tonumber(amt) or 0) * pct / 100))
+        if pendingSt ~= nil and b == pendingSt then
+          gainedSum = gainedSum + scaled
+          gainedCount = gainedCount + 1
+        end
+        return scaled
       end)
     end)
   end
@@ -116,14 +103,16 @@ return function(mod)
     Ui.push = function(text, ...)
       local r = nativePush(text, ...)
       pcall(function()
-        if not pendingMsg then return end
+        if pendingSt == nil then return end
         local st = liveState()
-        local pm = pendingMsg
-        pendingMsg = nil
-        if st and st == pm.st then
-          nativePush("All your POKéMON gained " .. tostring(pm.base)
+        local pst = pendingSt
+        pendingSt = nil
+        if st and st == pst and gainedCount > 0 and gainedSum > 0 then
+          nativePush("All your POKéMON gained "
+            .. tostring(math.floor(gainedSum / gainedCount))
             .. " EXP. Points!")
         end
+        gainedSum, gainedCount = 0, 0
       end)
       return r
     end
@@ -131,29 +120,8 @@ return function(mod)
   if mod.events and type(mod.events.on) == "function" then
     mod.events:on("battle.started", function()
       paidFor = nil
-      pendingMsg = nil
-    end)
-    mod.events:on("battle.ended", function(ev)
-      pcall(function()
-        pendingMsg = nil
-        if not SP.on() then return end
-        if type(ev) ~= "table" then return end
-        local b = ev.battle
-        if b == nil or b == paidFor then return end
-        if not ours(b) then return end
-        local E = expMod()
-        if not E then return end
-        local s = SP.session()
-        local party = s and s.party
-        local idx = eligible(party)
-        if #idx == 0 then return end
-        local keep = b.playerParty
-        b.playerParty = party
-        local okA = pcall(E.awardFoe, b, b.enemy,
-          { trainer = false, partyIndices = idx })
-        b.playerParty = keep
-        if okA then paidFor = b end
-      end)
+      pendingSt = nil
+      gainedSum, gainedCount = 0, 0
     end)
   end
   mod.log:info("safari-plus: catch exp installed (custom message)")

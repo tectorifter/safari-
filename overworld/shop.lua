@@ -14,12 +14,6 @@ return function(mod)
   inject()
   local okBg, Bag = pcall(require, "src.core.game3.bag")
   if okBg and Bag then
-    local lastBuyAt, lastBuyPrice = {}, {}
-    local function dup(numId, price)
-      if lastBuyPrice[numId] == price then return true end
-      local t = lastBuyAt[numId]
-      return t ~= nil and (SP.now() - t) < 2
-    end
     if type(Bag.canAdd) == "function" and not Bag.__spCanAddWrapped then
       Bag.__spCanAddWrapped = true
       local native = Bag.canAdd
@@ -28,8 +22,6 @@ return function(mod)
         if key then
           if (tonumber(qty) or 1) > 1 then return false end
           if SP.count(key) >= SP.maxOf(key) then return false end
-          local numId = tonumber(id) or id
-          if dup(numId, SP.price(key)) then return false end
           return true
         end
         return native(bag, id, qty, ...)
@@ -41,12 +33,8 @@ return function(mod)
       Bag.add = function(bag, id, qty, ...)
         local key = SP.isUpgId(id) and SP.keyOf(id) or nil
         if key then
-          local numId = tonumber(id) or id
-          local p = SP.price(key)
-          if dup(numId, p) then return false, 0 end
           local k = SP.addLevels(key, 1)
           if k <= 0 then return false, 0 end
-          lastBuyAt[numId], lastBuyPrice[numId] = SP.now(), p
           SP.refreshMeta(key)
           return true, k
         end
@@ -54,6 +42,7 @@ return function(mod)
       end
     end
   end
+  local wrapRse, wrapFrlg
   local okS, ShopMenu = pcall(require, "src.ui.game3.shop_menu")  if okS and ShopMenu and type(ShopMenu.show) == "function"
       and not ShopMenu.__spShopWrapped then
     ShopMenu.__spShopWrapped = true
@@ -77,15 +66,30 @@ return function(mod)
           opts.items = stock
         end
       end)
+      pcall(function() if wrapRse then wrapRse() end end)
+      pcall(function() if wrapFrlg then wrapFrlg() end end)
       return nativeShow(opts)
     end
   end
-  local okRse, RseShop = pcall(require, "src.ui.game3.rse.shop_menu")
-  if okRse and RseShop and type(RseShop.handleInput) == "function"
-      and not RseShop.__spQtyWrapped then
+  local function clampRse(shop)
+    if not SP.on() then return end
+    if type(shop) ~= "table" then return end
+    if shop.state ~= "qty" and shop.state ~= "confirm" then return end
+    if tonumber(shop.qty) == 1 then return end
+    if not SP.isUpgId(shop._itemId) then return end
+    shop.qty = 1
+    shop._totalCost = SP.price(SP.keyOf(shop._itemId))
+  end
+  wrapRse = function()
+    local okRse, RseShop = pcall(require, "src.ui.game3.rse.shop_menu")
+    if not (okRse and RseShop and type(RseShop.handleInput) == "function") then
+      return false
+    end
+    if RseShop.__spQtyWrapped then return true end
     RseShop.__spQtyWrapped = true
     local nativeInput = RseShop.handleInput
     RseShop.handleInput = function(shop, input, ...)
+      pcall(clampRse, shop)
       local r = nativeInput(shop, input, ...)
       pcall(function()
         if SP.on() and type(shop) == "table" and SP.isUpgId(shop._itemId)
@@ -98,6 +102,35 @@ return function(mod)
       end)
       return r
     end
+    return true
   end
+  local function clampFrlg(ShopMenu)
+    if not SP.on() then return end
+    if type(ShopMenu) ~= "table" then return end
+    if ShopMenu.mode ~= "buy_qty" and ShopMenu.mode ~= "buy_confirm" then return end
+    local p = ShopMenu._pending
+    if type(p) ~= "table" then return end
+    if tonumber(ShopMenu.qty) == 1 then return end
+    if not SP.isUpgId(p.id) then return end
+    ShopMenu.qty = 1
+  end
+  wrapFrlg = function()
+    local okF, ShopMenu = pcall(require, "src.ui.game3.shop_menu")
+    if not (okF and ShopMenu and type(ShopMenu.handleInput) == "function") then
+      return false
+    end
+    if ShopMenu.__spUpgQtyWrapped then return true end
+    ShopMenu.__spUpgQtyWrapped = true
+    local nativeInput = ShopMenu.handleInput
+    ShopMenu.handleInput = function(input, ...)
+      pcall(clampFrlg, ShopMenu)
+      local r = nativeInput(input, ...)
+      pcall(clampFrlg, ShopMenu)
+      return r
+    end
+    return true
+  end
+  wrapRse()
+  wrapFrlg()
   mod.log:info("safari-plus: oldale upgrade shelf installed")
 end

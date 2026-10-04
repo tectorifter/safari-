@@ -88,7 +88,7 @@ return function(mod)
         SP.setStock(have - q)
         return true
       end
-      return native(bag, id, ...)
+      return native(bag, id, qty, ...)
     end
   end
   if type(Bag.set) == "function" and not Bag.__spBallSetWrapped then

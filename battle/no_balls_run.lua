@@ -28,17 +28,6 @@ return function(mod)
       local nativeEnd = Safari.endBattleRse
       Safari.endBattleRse = function(session, st, ...)
         if SP.on() and type(st) == "table" and st.safari then
-          pcall(function()
-            local state = session and session.safari
-            local sf = st.safariState
-            if type(state) == "table" then
-              state.pkblkUses = (tonumber(state.pkblkUses) or 0)
-                + (tonumber(sf and sf.pokeblockThrows) or 0)
-              if st.result == "catch" then
-                state.caughtMons = (tonumber(state.caughtMons) or 0) + 1
-              end
-            end
-          end)
           return false
         end
         return nativeEnd(session, st, ...)
@@ -75,7 +64,6 @@ return function(mod)
               seFlee()
             end
             noBalls = true
-            pcall(wrapSafari)
             return text
           end
         end

@@ -66,22 +66,9 @@ never touches the bag.
 - conversion via `Bag.add`/`Bag.canAdd` wraps.
 - `overworld/bag_balls.lua` — permanent virtual SAFARI BALL bag slot
 - mirroring the live stock.
-- `overworld/entrance.lua` — `world.talk` hook: on the Route 121
-- Safari Zone entrance map, NPCs whose script identity mentions
-- safari don't respond while the mod is on. Also breaks the zone
-- game pipeline while on: `Safari.enter`/`exit`/`exitToEntrance`/
-- `timesUp`/`outOfBalls`/`retirePrompt` are neutralized (specials 208
-- and 209 can't start the step counter, lock the party, or teleport
-- you to the lobby), the zone flag is cleared on boot and load, and
-- zone steps never tick down — the zone is free-roam. The counter
-- trigger and entry scripts are swallowed at the script runner (the
-- field is unlocked so movement never sticks), so you walk past the
-- desk and through the door warp with no Pokéblock Case check, no
-- 500 charge, and no timed game. The exit-door guard inside the
-- zone south is hidden while on (safari-scripted NPCs near you, or
-- anything standing within a tile), so the way back out stays open;
-- it returns when you leave or switch the mod off. All other maps
-- and NPCs, and the OFF state, pass through untouched.
+- `overworld/entrance.lua` — the exit-door guard inside the zone
+- south is parked 1 left and 6 up while on, so the way back out
+- stays open; it returns when you leave or switch the mod off.
 
 ## Verify
 

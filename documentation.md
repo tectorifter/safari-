@@ -42,56 +42,38 @@
 - through otherwise.
 - `src.core.game3.bag.add` / `canAdd` (guards `Bag.__spAddWrapped` /
 - `Bag.__spCanAddWrapped`): upgrade ids (9001-9004) convert to levels,
-- never enter the bag. Single-level only (qty > 1 refused); a repeat
-- of the same id at the same price, or within 2 wall seconds of the
-- last buy, is refused, so a double-fired confirm at high game speed
-- can neither double-apply nor double-charge.
+- never enter the bag. Single-level only (qty > 1 refused); at max
+- level the buy is refused, otherwise every confirm applies exactly
+- one level.
 - `src.core.game3.bag.get` / `canAdd` / `add` / `remove` / `set` /
 - `listPocket` (guards `Bag.__spBall*Wrapped`): item id 5 (SAFARI
 - BALL) is virtual and mirrors the live stock, so the balls pocket
 - always lists it, even at 0. Stray real slots are absorbed into the
 - stock; add/remove/set adjust the stock clamped to the live cap.
-- `world.talk` hook: on the Route 121 Safari Zone entrance map
-- (`EM_ROUTE121_SAFARI_ZONE_ENTRANCE`, dashes and the ENTRACE
-- spelling also match), NPCs whose script key or def mentions safari
-- are swallowed (no response) while the mod is on. All other maps,
-- NPCs, and the OFF state call through.
-- `src.core.game3.safari.enter` / `exit` / `exitToEntrance` /
-- `timesUp` / `outOfBalls` / `retirePrompt` (guards
-- `Safari.__spEnterWrapped` etc.): neutralized while the mod is on,
-- so specials 208/209 can't start the timed zone game, lock the
-- party, wipe the stock, or teleport to the lobby; the zone flag is
-- additionally cleared on boot and `save.loaded`. `Safari.takeStep`
-- (guard `Safari.__spTakeStepWrapped`): regen tick, then zone steps
-- are skipped while on; calls through otherwise.
-- Script-runner interception (guards `Space.__spScriptWrapped` /
-- `Space.__spRunWrapped`): the entrance counter/try-enter/no-case/
-- exit-walk scripts and the zone exit/out-of-balls/retire/times-up
-- scripts are swallowed while on, and the field is unlocked so
-- movement never sticks — walk past the desk and through the door
-- with no case check, no fee, and no timed game. Keys resolve via
-- `Space.scriptKey` plus the live rse safari config; unresolvable
-- keys pass through.
-- Exit-guard clearing: `Objects.loadMap` / `spawnFromDefs` /
-- `adoptPool` are wrapped so every south map load (door entry,
-- warps, continuing a save inside) re-parks the exit-door guard 1
-- left and 6 up (x-1, y-6) via `setObjectXY`, plus any
-- safari/exit-scripted NPC on that map, while the mod is on; a `forDraw` self-heal
-- re-runs the sweep before every frame, so the guard is already
-- moved on the very first frame after entering from the start
-- screen, and any respawn back at its post is re-parked just as
-- fast. Switching off or leaving the map restores every moved NPC
-- to its original tile. `world.talk` swallows talks to moved
-- guards,
-- safari/exit-scripted NPCs, and anything adjacent on that map, so
-- the empty tile stays silent. `mod.options_changed`
-- re-evaluates the switch — the block stays gone until you leave
-- or switch off.
-- `src.ui.game3.shop_menu.show` (guard `ShopMenu.__spShopWrapped`):- Oldale mart (`session.map == "EM_OLDALE_TOWN_MART"`) appends
+- `Bag.remove` / `set` pass `qty` through for non-ball ids (a
+- dropped argument previously removed/set only 1 regardless of qty).
+- Exit-guard relocation: `Objects.loadMap` / `spawnFromDefs` /
+- `adoptPool` are wrapped so every south map load re-parks the
+- exit-door guard 1 left and 6 up (x-1, y-6) via `setObjectXY`,
+- plus any safari/exit-scripted NPC near the door, while the mod is
+- on. Re-applied on `save.loaded`, `game.ready`, `mods.loaded`,
+- and `map.entered`. Switching off or leaving the map restores
+- every moved NPC to its original tile.
+- `src.core.game3.safari.enter` (guard `Safari.__spEnterWrapped`):
+- returns false while the mod is on, so the timed zone game can't
+- start. The four entrance-desk scripts (counter, try-enter,
+- no-case, exit-walk) are swallowed at the script runner with the
+- field unlocked, so with or without the POKéBLOCK CASE you walk
+- past the desk with no fee and no timed game.- `src.ui.game3.shop_menu.show` (guard `ShopMenu.__spShopWrapped`):- Oldale mart (`session.map == "EM_OLDALE_TOWN_MART"`) appends
 - non-maxed upgrade rows with dynamic prices; stock table is copied.
 - `src.ui.game3.rse.shop_menu.handleInput` (guard
-- `RseShop.__spQtyWrapped`): upgrade rows are clamped to qty 1 (total
-- rescales to the single unit price); calls through.
+- `RseShop.__spQtyWrapped`): upgrade rows are clamped to qty 1
+- *before* the engine reads them (total reset to the single unit
+- price) with the old after-the-fact rescale kept as a safety net,
+- so a multiplied total can never reach a money check; the FRLG
+- `src.ui.game3.shop_menu.handleInput` (guard
+- `ShopMenu.__spUpgQtyWrapped`) clamps the same way. Both install
+- at boot and are retried on every shop open.
 - `ItemsData._byId` gains entries 9001-9004 (name/price/description).
 - `BagChrome._icons` pre-seeded blank for 9001-9004.
 
@@ -99,10 +81,9 @@
 - `Catching.__spCatchExpWrapped`): on a safari catch, runs the engine's
 - own `Experience.awardFoe` with every alive sub-100 non-egg party mon
 - as recipient, then queues a custom "All your POKéMON gained N EXP.
-- Points!" line, delivered after the Gotcha message. N is the scaled
-- per-mon share (EXP YIELD setting, default 50%). Tutorials
-- excluded. A `battle.ended` fallback silently awards only if the
-- in-scene award never ran.
+- Points!" line, delivered after the Gotcha message. N is the
+- measured per-mon share actually distributed (EXP YIELD setting,
+- default 50%); at 0% no line is shown. Tutorials excluded.
 - `exp.gain` hook: inside safari battles the per-mon award is scaled
 - by EXP YIELD (0-500%) relative to the defeated yield; other battles
 - pass through untouched.
@@ -111,12 +92,12 @@
 - `STRINGID_OUTOFSAFARIBALLS` renders as the run-away string with the
 - flee sound, once per battle; calls through otherwise.
 - `src.core.game3.safari.endBattleRse` (guard `Safari.__spRunWrapped`):
-- any of our safari battles (`st.safari` while the mod is on) keeps
-- the zone counters but returns false before the out-of-balls script
-- and the entrance warp, for every end kind (thrown-out, fled,
-- last-ball catch). Non-safari battles call through. The wrap is
-- installed at boot and retried on every `battle.started`, so a
-- boot-time require miss cannot leave the eject pipeline armed.
+- any of our safari battles (`st.safari` while the mod is on) returns
+- false before the out-of-balls script and the entrance warp, for
+- every end kind (thrown-out, fled, last-ball catch). Non-safari
+- battles call through. The wrap is installed at boot and retried on
+- every `battle.started`, so a boot-time require miss cannot leave
+- the eject pipeline armed.
 - `src.core.game3.safari.outOfBallsMidBattle` (guard
 - `Safari.__spMidWrapped`): skipped once the no-balls text converted
 - in the current battle; calls through otherwise.
