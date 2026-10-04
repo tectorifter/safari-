@@ -1,0 +1,20 @@
+return {
+  summary = "Emerald Safari overhaul: every wild and fated encounter runs the native Safari scene; Oldale sells stacking catch-rate, escape-calming, ball-regen and ball-cap upgrades.",
+  author = "Emerald Mod Studio",
+  tags = { "gen3", "emerald", "safari", "catch", "shop" },
+  differences = {
+    added = {
+      "Wild encounters and fated (scripted/static) encounters open the native Emerald Safari scene instead of the normal combat scene. Trainer battles are untouched.",
+      "Deep Safari Ball stock (10 base cap, +2 per BALL CAP level to 70) with wall-clock regen: one ball per interval, starting at 12 real seconds, upgrades shorten it to 5 seconds. Wall-clock time is immune to game speed. SAFARI BALL is always listed in the bag with the live count, even at 0.",
+      "Oldale mart sells four stacking upgrades with dynamic pricing (50 + 50 per owned level, starting at 50): SAFARI UPG (+0.1 catch rate inside the catch-factor formula per level, 60 levels), LIKEABLE (-0.1 escape factor per level, floor 0.1, 30 levels), BALL RECOVERY (-100ms regen interval per level, 70 levels), BALL CAP (+2 ball cap per level, 30 levels). Maxed lines leave the shelf.",
+      "Safari catches pay scaled EXP (EXP YIELD setting, default 50% of what the species would yield if defeated) to every alive sub-100 non-egg party mon through the normal in-battle presentation.",
+      "The Hoenn Safari Zone entrance desk is disabled while the mod is on (everywhere is already safari): the entrance attendant simply doesn't respond.",
+    },
+    known = {
+      "Upgrade rows show no item icon (blank slot) and are not real items: buying one applies the level immediately and never touches the bag, so there is nothing to sell back.",
+      "Bulk quantity buys apply one level per unit at the pre-purchase unit price.",
+      "an unofficial fan mod: Pokemon and all related names and assets are (c) Nintendo / Creatures Inc. / GAME FREAK inc. / The Pokemon Company and this project is not affiliated with or endorsed by them",
+    },
+  },
+  compat = { engine = ">=0.0.0-0 <2.0.0", modApi = 2 },
+}

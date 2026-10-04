@@ -1,0 +1,25 @@
+{
+  "id": "safari-plus",
+  "name": "safari-plus",
+  "version": "0.11.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "game_version": ">=0.3.40",
+  "games": [
+    "emerald"
+  ],
+  "category": "GAMEPLAY",
+  "priority": 90,
+  "permissions": [
+    "engine_internals"
+  ],
+  "dependencies": [],
+  "optional_dependencies": [],
+  "description": "Emerald Safari overhaul: wild and fated encounters run safari mode.",
+  "github": "https://github.com/tectorifter/safari-",
+  "options_schema": "options.lua",
+  "experimental": false,
+  "conflicts": [],
+  "incompatible": []
+}
