@@ -13,7 +13,8 @@
 - `Rules.safari.fleeRate` (guard `RS.__spFleeWrapped`): escape factor
 - reduced 0.1 per LIKEABLE level, floor 0.1.
 - `src.core.game3.safari.takeStep` (guard `Safari.__spTakeStepWrapped`):
-- wall-clock regen tick; calls through.
+- wall-clock regen tick, then zone steps are skipped while on; calls
+- through otherwise.
 - `src.core.game3.bag.add` / `canAdd` (guards `Bag.__spAddWrapped` /
 - `Bag.__spCanAddWrapped`): upgrade ids (9001-9004) convert to levels,
 - never enter the bag. Single-level only (qty > 1 refused); a repeat
@@ -30,6 +31,37 @@
 - spelling also match), NPCs whose script key or def mentions safari
 - are swallowed (no response) while the mod is on. All other maps,
 - NPCs, and the OFF state call through.
+- `src.core.game3.safari.enter` / `exit` / `exitToEntrance` /
+- `timesUp` / `outOfBalls` / `retirePrompt` (guards
+- `Safari.__spEnterWrapped` etc.): neutralized while the mod is on,
+- so specials 208/209 can't start the timed zone game, lock the
+- party, wipe the stock, or teleport to the lobby; the zone flag is
+- additionally cleared on boot and `save.loaded`. `Safari.takeStep`
+- (guard `Safari.__spTakeStepWrapped`): regen tick, then zone steps
+- are skipped while on; calls through otherwise.
+- Script-runner interception (guards `Space.__spScriptWrapped` /
+- `Space.__spRunWrapped`): the entrance counter/try-enter/no-case/
+- exit-walk scripts and the zone exit/out-of-balls/retire/times-up
+- scripts are swallowed while on, and the field is unlocked so
+- movement never sticks — walk past the desk and through the door
+- with no case check, no fee, and no timed game. Keys resolve via
+- `Space.scriptKey` plus the live rse safari config; unresolvable
+- keys pass through.
+- Exit-guard clearing: `Objects.loadMap` / `spawnFromDefs` /
+- `adoptPool` are wrapped so every south map load (door entry,
+- warps, continuing a save inside) re-parks the exit-door guard 1
+- left and 6 up (x-1, y-6) via `setObjectXY`, plus any
+- safari/exit-scripted NPC on that map, while the mod is on; a `forDraw` self-heal
+- re-runs the sweep before every frame, so the guard is already
+- moved on the very first frame after entering from the start
+- screen, and any respawn back at its post is re-parked just as
+- fast. Switching off or leaving the map restores every moved NPC
+- to its original tile. `world.talk` swallows talks to moved
+- guards,
+- safari/exit-scripted NPCs, and anything adjacent on that map, so
+- the empty tile stays silent. `mod.options_changed`
+- re-evaluates the switch — the block stays gone until you leave
+- or switch off.
 - `src.ui.game3.shop_menu.show` (guard `ShopMenu.__spShopWrapped`):- Oldale mart (`session.map == "EM_OLDALE_TOWN_MART"`) appends
 - non-maxed upgrade rows with dynamic prices; stock table is copied.
 - `src.ui.game3.rse.shop_menu.handleInput` (guard
@@ -63,6 +95,25 @@
 - `src.core.game3.safari.outOfBallsMidBattle` (guard
 - `Safari.__spMidWrapped`): skipped once the no-balls text converted
 - in the current battle; calls through otherwise.
+- `src.core.game3.rse.init.call` (guard `Rse.__spCaseWrapped`):
+- safari-battle `pokeblock.chooseForBattle` is gated on item 260 —
+- without the POKéBLOCK CASE the battle shows "You don't have the
+- POKéBLOCK CASE yet." and returns to the safari menu instead of
+- opening the case screen; with the case it re-wires the call to
+- `chooseForBattle(session, callback)` (the battle passes extra
+- leading args the case screen never accepted, which left B/cancel
+- calling back into nothing and locked the screen) so B drops back
+- to the safari menu. Installed at boot and retried on every
+- `battle.started`.
+- `src.core.game3.battle.update` (guard `B.__spCaseInputWrapped`):
+- while `safari_pokeblock` the battle never forwards input to the
+- open case screen (it does for Pokédex/party/bag, but has no case
+- branch), so the screen rendered but ate no buttons; the wrap pumps
+- `handleInput`/`update` into it every frame until it closes, so B
+- leaves and A throws. If the case is gone but the battle never
+- resumed (close callback lost), the wrap forces phase back to
+- `command` and reopens the menu, and the first pump error is
+- logged once per battle instead of swallowed.
 
 ## Events
 

@@ -54,6 +54,7 @@ return function(mod)
     local nativeStep = Safari.takeStep
     Safari.takeStep = function(session, game, ...)
       pcall(SP.tick)
+      if SP.on() then return false end
       return nativeStep(session, game, ...)
     end
   end
