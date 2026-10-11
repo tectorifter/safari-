@@ -6,8 +6,11 @@ This means that safari exploration is free of entrance fee (step counter for exi
 
 What do upgrades do:
 -Safari Upgrade, increases safari ball catch rate up to +21% catch rate.
+
 -Safari Ball capacity, increases max balls held by player.
+
 -Ball Recovery, speeds up the rate safari balls are generated for player.
+
 -Likeability, reduces the chances of pokemon running away from player after each action in safari mode, legendaries have 50% chance of runnning away, maxed skill reduces it to 9% instead.
 
 
