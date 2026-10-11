@@ -5,6 +5,7 @@ Emerald Safari overhaul. Every wild encounter is turned to play with emerald's s
 This means that safari exploration is free of entrance fee (step counter for exit and the max 30 safari balls cap are removed), this is to ensure the safari mode isn't broken nor sends player to safari area wrongly after balls reach 0 quantity.
 
 What do upgrades do:
+
 -Safari Upgrade, increases safari ball catch rate up to +21% catch rate.
 
 -Safari Ball capacity, increases max balls held by player.
