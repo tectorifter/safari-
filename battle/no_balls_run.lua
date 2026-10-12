@@ -1,30 +1,30 @@
 return function(mod)
   local SP = mod.exports.safariPlus
   if not SP then return end
+  -- Running out of balls plays the run-away pipeline (got-away message
+  -- + flee sound, no zone eject) instead of the safari out-of-balls
+  -- pipeline.
   local converted = nil
   local noBalls = false
   local function battleState()
-    local okB, B = pcall(require, "src.core.game3.battle")
-    if okB and B and type(B.getState) == "function" then
+    local B = SP.require("src.core.game3.battle")
+    if type(B) == "table" and type(B.getState) == "function" then
       local ok, st = pcall(B.getState)
       if ok and type(st) == "table" then return st end
     end
     return nil
   end
   local function seFlee()
-    pcall(function()
-      local Audio = require("src.core.game3.audio")
-      local SE = require("src.core.game3.se_ids")
-      if Audio and Audio.playSe and SE and SE.SE_FLEE then
-        Audio.playSe(SE.SE_FLEE)
-      end
-    end)
+    local Audio = SP.require("src.core.game3.audio")
+    local SE = SP.require("src.core.game3.se_ids")
+    if Audio and Audio.playSe and SE and SE.SE_FLEE then
+      SP.try(Audio.playSe, SE.SE_FLEE)
+    end
   end
   local function wrapSafari()
-    local okS, Safari = pcall(require, "src.core.game3.safari")
-    if not (okS and Safari) then return false end
-    if type(Safari.endBattleRse) == "function" and not Safari.__spRunWrapped then
-      Safari.__spRunWrapped = true
+    local Safari = SP.require("src.core.game3.safari")
+    if type(Safari) ~= "table" then return false end
+    if type(Safari.endBattleRse) == "function" and SP.claim(Safari, "__spRunWrapped") then
       local nativeEnd = Safari.endBattleRse
       Safari.endBattleRse = function(session, st, ...)
         if SP.on() and type(st) == "table" and st.safari then
@@ -34,8 +34,7 @@ return function(mod)
       end
     end
     if type(Safari.outOfBallsMidBattle) == "function"
-        and not Safari.__spMidWrapped then
-      Safari.__spMidWrapped = true
+        and SP.claim(Safari, "__spMidWrapped") then
       local nativeMid = Safari.outOfBallsMidBattle
       Safari.outOfBallsMidBattle = function(session, game, ...)
         if SP.on() and (noBalls or converted ~= nil) then
@@ -49,9 +48,9 @@ return function(mod)
     return true
   end
   wrapSafari()
-  local okT, BT = pcall(require, "src.core.game3.battle.battle_text")
-  if okT and BT and type(BT.get) == "function" and not BT.__spRunWrapped then
-    BT.__spRunWrapped = true
+  local BT = SP.require("src.core.game3.battle.battle_text")
+  if type(BT) == "table" and type(BT.get) == "function"
+      and SP.claim(BT, "__spRunWrapped") then
     local nativeGet = BT.get
     BT.get = function(id, fill, ...)
       if SP.on() and id == "STRINGID_OUTOFSAFARIBALLS" then
@@ -75,7 +74,11 @@ return function(mod)
     mod.events:on("battle.started", function()
       converted = nil
       noBalls = false
-      pcall(wrapSafari)
+      wrapSafari()
+    end)
+    mod.events:on("battle.ended", function()
+      converted = nil
+      noBalls = false
     end)
   end
   mod.log:info("safari-plus: out-of-balls runs away")

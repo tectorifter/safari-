@@ -1,11 +1,15 @@
 return function(mod)
   local SP = mod.exports.safariPlus
   if not SP then return end
+  -- The exit-door guard on the zone south map is parked out of the way
+  -- while the mod is on (and restored on leaving/switching off), the
+  -- timed zone game can't start, and the entrance-desk scripts are
+  -- swallowed with the field unlocked: walk past with no fee.
   local function normMap(m)
     return tostring(m or ""):upper():gsub("-", "_")
   end
   local function isSouthMap(m)
-    return normMap(m):find("SAFARI_ZONE_SOUTH", 1, true) ~= nil
+    return normMap(m):match("SAFARI_ZONE_SOUTH$") ~= nil
   end
   local function mentions(v, words, depth)
     if depth > 2 then return false end
@@ -45,8 +49,8 @@ return function(mod)
   local function placeOne(lid, nx, ny)
     lid = tonumber(lid) or lid
     if lid == nil then return false end
-    local ok, Objects = pcall(require, "src.core.game3.objects")
-    if not (ok and Objects) then return false end
+    local Objects = SP.require("src.core.game3.objects")
+    if type(Objects) ~= "table" then return false end
     local done = false
     pcall(function()
       if type(Objects.setObjectXY) == "function" then
@@ -73,12 +77,18 @@ return function(mod)
     local ey = tonumber(eo.cellY) or tonumber(eo.y)
     if not (ex and ey) then return false end
     local rec = movedGuards[lid]
+    local fresh = (rec == nil)
     if rec == nil then
       rec = { ox = ex, oy = ey, nx = ex - SHIFT, ny = ey - LIFT }
       movedGuards[lid] = rec
     end
     if ex == rec.nx and ey == rec.ny then return true end
-    return placeOne(lid, rec.nx, rec.ny)
+    local done = placeOne(lid, rec.nx, rec.ny)
+    if done and fresh then
+      mod.log:info("safari-plus: parked door guard %s sk=%s",
+        tostring(lid), tostring(eo.scriptKey))
+    end
+    return done
   end
   local function restoreGuards(map)
     if next(movedGuards) == nil then return end
@@ -88,11 +98,9 @@ return function(mod)
       m = s and s.map
     end
     if isSouthMap(m) then
-      pcall(function()
-        for lid, rec in pairs(movedGuards) do
-          pcall(placeOne, lid, rec.ox, rec.oy)
-        end
-      end)
+      for lid, rec in pairs(movedGuards) do
+        placeOne(lid, rec.ox, rec.oy)
+      end
     end
     movedGuards = {}
   end
@@ -103,8 +111,9 @@ return function(mod)
     if m == nil then return end
     if not isSouthMap(m) then restoreGuards(m) return end
     pcall(function()
-      local Objects = require("src.core.game3.objects")
-      if not (Objects and type(Objects.listActive) == "function"
+      local Objects = SP.require("src.core.game3.objects")
+      if type(Objects) ~= "table" then return end
+      if not (type(Objects.listActive) == "function"
           and type(Objects.find) == "function") then return end
       local pid = Objects.PLAYER_LOCAL_ID or 0xFF
       for _, lid in ipairs(Objects.listActive()) do
@@ -134,45 +143,41 @@ return function(mod)
     end)
   end
   local function wrapObjects()
-    local okO, Objects = pcall(require, "src.core.game3.objects")
-    if not (okO and Objects) then return false end
+    local Objects = SP.require("src.core.game3.objects")
+    if type(Objects) ~= "table" then return false end
     if type(Objects.loadMap) == "function"
-        and not Objects.__spLoadWrapped then
-      Objects.__spLoadWrapped = true
+        and SP.claim(Objects, "__spLoadWrapped") then
       local native = Objects.loadMap
       Objects.loadMap = function(game, mapId, mapDef, ...)
         local a, b, c = native(game, mapId, mapDef, ...)
-        if SP.on() then pcall(clearDoorGuards, mapId) end
+        if SP.on() then clearDoorGuards(mapId) end
         return a, b, c
       end
     end
     if type(Objects.spawnFromDefs) == "function"
-        and not Objects.__spSpawnWrapped then
-      Objects.__spSpawnWrapped = true
+        and SP.claim(Objects, "__spSpawnWrapped") then
       local native = Objects.spawnFromDefs
       Objects.spawnFromDefs = function(defs, mapDef, mapId, ...)
         local a, b, c = native(defs, mapDef, mapId, ...)
-        if SP.on() then pcall(clearDoorGuards, mapId) end
+        if SP.on() then clearDoorGuards(mapId) end
         return a, b, c
       end
     end
     if type(Objects.adoptPool) == "function"
-        and not Objects.__spAdoptWrapped then
-      Objects.__spAdoptWrapped = true
+        and SP.claim(Objects, "__spAdoptWrapped") then
       local native = Objects.adoptPool
       Objects.adoptPool = function(pool, ...)
         local a, b, c = native(pool, ...)
-        if SP.on() then pcall(clearDoorGuards) end
+        if SP.on() then clearDoorGuards() end
         return a, b, c
       end
     end
     return true
   end
   local function wrapZone()
-    local okS, Safari = pcall(require, "src.core.game3.safari")
-    if not (okS and Safari) then return false end
-    if type(Safari.enter) == "function" and not Safari.__spEnterWrapped then
-      Safari.__spEnterWrapped = true
+    local Safari = SP.require("src.core.game3.safari")
+    if type(Safari) ~= "table" then return false end
+    if type(Safari.enter) == "function" and SP.claim(Safari, "__spEnterWrapped") then
       local native = Safari.enter
       Safari.enter = function(session, ...)
         if SP.on() then return false end
@@ -189,28 +194,25 @@ return function(mod)
   }
   local function scriptTargets()
     local out = {}
-    pcall(function()
-      local Space = require("src.core.game3.scripting.space")
-      if not (Space and type(Space.scriptKey) == "function") then return end
+    local Space = SP.require("src.core.game3.scripting.space")
+    if type(Space) == "table" and type(Space.scriptKey) == "function" then
       for _, label in ipairs(SCRIPT_LABELS) do
         local ok, k = pcall(Space.scriptKey, label)
         if ok and k ~= nil then out[k] = true end
       end
-    end)
+    end
     return out
   end
   local function unlockField()
-    pcall(function()
-      local Field = package.loaded["src.core.game3.field"]
-      if Field then
-        if type(Field.unlock) == "function" then Field.unlock() end
-        Field.locked = false
-      end
-    end)
+    local Field = package.loaded["src.core.game3.field"]
+    if type(Field) == "table" then
+      if type(Field.unlock) == "function" then pcall(Field.unlock) end
+      Field.locked = false
+    end
   end
   local function wrapScripts()
-    local okS, Space = pcall(require, "src.core.game3.scripting.space")
-    if not (okS and Space) then return false end
+    local Space = SP.require("src.core.game3.scripting.space")
+    if type(Space) ~= "table" then return false end
     local function gate(key)
       if not SP.on() then return nil end
       if scriptTargets()[key] then
@@ -220,8 +222,7 @@ return function(mod)
       return nil
     end
     if type(Space.startScript) == "function"
-        and not Space.__spScriptWrapped then
-      Space.__spScriptWrapped = true
+        and SP.claim(Space, "__spScriptWrapped") then
       local native = Space.startScript
       Space.startScript = function(key, ...)
         local hit = gate(key)
@@ -230,8 +231,7 @@ return function(mod)
       end
     end
     if type(Space.runImmediately) == "function"
-        and not Space.__spRunWrapped then
-      Space.__spRunWrapped = true
+        and SP.claim(Space, "__spRunWrapped") then
       local native = Space.runImmediately
       Space.runImmediately = function(script, ...)
         local hit = gate(script)
@@ -242,10 +242,10 @@ return function(mod)
     return true
   end
   local function rearm()
-    pcall(wrapZone)
-    pcall(wrapScripts)
-    pcall(wrapObjects)
-    pcall(clearDoorGuards)
+    wrapZone()
+    wrapScripts()
+    wrapObjects()
+    clearDoorGuards()
   end
   rearm()
   if mod.events and type(mod.events.on) == "function" then
@@ -254,13 +254,13 @@ return function(mod)
     mod.events:on("mods.loaded", rearm)
     mod.events:on("map.entered", function(ev)
       if type(ev) == "table" and ev.mapId ~= nil then
-        pcall(clearDoorGuards, ev.mapId)
+        clearDoorGuards(ev.mapId)
       else
-        pcall(clearDoorGuards)
+        clearDoorGuards()
       end
     end)
     mod.events:on("mod.options_changed", function()
-      pcall(clearDoorGuards)
+      clearDoorGuards()
     end)
   end
   mod.log:info("safari-plus: exit-door guard relocated")

@@ -1,8 +1,11 @@
 return function(mod)
   local SP = mod.exports.safariPlus
   if not SP then return end
-  local okR, Rules = pcall(require, "src.core.game3.battle.rules")
-  if not (okR and Rules and type(Rules.safari) == "table") then
+  -- Catch/escape tuning on the native safari formulas: battle stock
+  -- from the live stock, +0.35 catch per level, per-species flee from
+  -- BST (no Speed term) scaled by likeability.
+  local Rules = SP.require("src.core.game3.battle.rules")
+  if type(Rules) ~= "table" or type(Rules.safari) ~= "table" then
     mod.log:warn("safari-plus: factors not installed -- no safari rules")
     return
   end
@@ -13,8 +16,7 @@ return function(mod)
     if b ~= nil then return math.max(0, math.floor(b)) end
     return fallback
   end
-  if type(RS.newStateRse) == "function" and not RS.__spRseWrapped then
-    RS.__spRseWrapped = true
+  if type(RS.newStateRse) == "function" and SP.claim(RS, "__spRseWrapped") then
     local native = RS.newStateRse
     RS.newStateRse = function(catchRate, cfg, ...)
       local st = native(catchRate, cfg, ...)
@@ -24,8 +26,7 @@ return function(mod)
       return st
     end
   end
-  if type(RS.newState) == "function" and not RS.__spNewWrapped then
-    RS.__spNewWrapped = true
+  if type(RS.newState) == "function" and SP.claim(RS, "__spNewWrapped") then
     local native = RS.newState
     RS.newState = function(catchRate, fleeRate, ...)
       local st = native(catchRate, fleeRate, ...)
@@ -35,8 +36,7 @@ return function(mod)
       return st
     end
   end
-  if type(RS.ballCatchRate) == "function" and not RS.__spRateWrapped then
-    RS.__spRateWrapped = true
+  if type(RS.ballCatchRate) == "function" and SP.claim(RS, "__spRateWrapped") then
     local native = RS.ballCatchRate
     RS.ballCatchRate = function(sf, ...)
       local base = tonumber(native(sf, ...)) or 0
@@ -46,29 +46,33 @@ return function(mod)
   end
   local function speciesBST()
     local bst = nil
-    pcall(function()
-      local B = require("src.core.game3.battle")
-      local st = B and type(B.getState) == "function" and B.getState() or nil
-      local foe = type(st) == "table" and st.enemy or nil
-      if type(foe) ~= "table" then return end
-      local mon = foe.mon
-      local sid = tonumber(foe.species
-        or (type(mon) == "table" and (mon.species or mon.speciesId))
-        or foe.speciesId)
-      if sid == nil then return end
-      local Pokemon = require("src.core.game3.pokemon")
-      local tab = Pokemon and type(Pokemon.stats) == "function"
-        and Pokemon.stats(sid) or nil
-      if type(tab) ~= "table" then return end
-      local total = (tonumber(tab.hp) or 0) + (tonumber(tab.atk) or 0)
-        + (tonumber(tab.def) or 0) + (tonumber(tab.spe) or 0)
-        + (tonumber(tab.spa) or 0) + (tonumber(tab.spd) or 0)
-      if total > 0 then bst = total end
-    end)
+    local B = SP.require("src.core.game3.battle")
+    local st = nil
+    if B and type(B.getState) == "function" then
+      local ok, v = pcall(B.getState)
+      if ok then st = v end
+    end
+    local foe = type(st) == "table" and st.enemy or nil
+    if type(foe) ~= "table" then return nil end
+    local mon = foe.mon
+    local sid = tonumber(foe.species
+      or (type(mon) == "table" and (mon.species or mon.speciesId))
+      or foe.speciesId)
+    if sid == nil then return nil end
+    local Pokemon = SP.require("src.core.game3.pokemon")
+    local tab = nil
+    if Pokemon and type(Pokemon.stats) == "function" then
+      local okS, v = pcall(Pokemon.stats, sid)
+      if okS then tab = v end
+    end
+    if type(tab) ~= "table" then return nil end
+    local total = (tonumber(tab.hp) or 0) + (tonumber(tab.atk) or 0)
+      + (tonumber(tab.def) or 0) + (tonumber(tab.spe) or 0)
+      + (tonumber(tab.spa) or 0) + (tonumber(tab.spd) or 0)
+    if total > 0 then bst = total end
     return bst
   end
-  if type(RS.fleeRate) == "function" and not RS.__spFleeWrapped then
-    RS.__spFleeWrapped = true
+  if type(RS.fleeRate) == "function" and SP.claim(RS, "__spFleeWrapped") then
     local native = RS.fleeRate
     RS.fleeRate = function(sf, ...)
       if SP.on() then

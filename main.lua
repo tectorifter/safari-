@@ -13,33 +13,34 @@ return function(mod)
     end
     return ok
   end
-  mod.options:define({
-    {
-      key = "safari",
-      label = "SAFARI",
-      type = "toggle",
-      default = true,
-      description = "ON: wild and fated encounters use the native Safari scene with a deep ball stock and wall-clock regen. OFF: vanilla battles.",
-    },
-    {
-      key = "exp_yield",
-      label = "EXP YIELD",
-      type = "choice",
-      default = "50",
-      choices = { { "0%", "0" }, { "10%", "10" }, { "25%", "25" }, { "50%", "50" }, { "75%", "75" }, { "100%", "100" }, { "150%", "150" }, { "200%", "200" }, { "300%", "300" }, { "400%", "400" }, { "500%", "500" } },
-      description = "Scales the EXP a safari catch pays, relative to what the caught species would yield if defeated: 50% default. 0% pays nothing.",
-    },
-  })
+  local skills = loadSibling("data/skills.lua")
+  assert(type(skills) == "table", "safari-plus: data/skills.lua must return a table")
+  mod.exports.spSkillData = skills
+  local options = loadSibling("data/options.lua")
+  assert(type(options) == "table", "safari-plus: data/options.lua must return a table")
+  mod.options:define(options)
   boot("shared", function() loadSibling("shared.lua")(mod) end)
+  local SP = mod.exports.safariPlus
+  assert(SP, "safari-plus: shared failed")
+  local candy = loadSibling("battle/candy_data.lua")
+  assert(type(candy) == "table", "safari-plus: battle/candy_data.lua must return a table")
+  SP.candyData = candy
   boot("safari_force", function() loadSibling("battle/safari_force.lua")(mod) end)
   boot("factors", function() loadSibling("battle/factors.lua")(mod) end)
   boot("ball_guard", function() loadSibling("battle/ball_guard.lua")(mod) end)
   boot("catch_exp", function() loadSibling("battle/catch_exp.lua")(mod) end)
+  boot("candy_icons", function() loadSibling("battle/candy_icons.lua")(mod) end)
+  boot("candy_flow", function() loadSibling("battle/candy_flow.lua")(mod) end)
+  boot("candy_dialog", function() loadSibling("battle/candy_dialog.lua")(mod) end)
   boot("duplicate_candy", function() loadSibling("battle/duplicate_candy.lua")(mod) end)
+  boot("iv_guard", function() loadSibling("battle/iv_guard.lua")(mod) end)
   boot("no_balls_run", function() loadSibling("battle/no_balls_run.lua")(mod) end)
   boot("pokeblock_case", function() loadSibling("battle/pokeblock_case.lua")(mod) end)
-  boot("shop", function() loadSibling("overworld/shop.lua")(mod) end)
+  boot("catch_speed", function() loadSibling("battle/catch_speed.lua")(mod) end)
+  boot("mastery", function() loadSibling("battle/mastery.lua")(mod) end)
+  boot("safari_xp", function() loadSibling("battle/safari_xp.lua")(mod) end)
   boot("bag_balls", function() loadSibling("overworld/bag_balls.lua")(mod) end)
+  boot("safari_menu", function() loadSibling("overworld/safari_menu.lua")(mod) end)
   boot("entrance", function() loadSibling("overworld/entrance.lua")(mod) end)
   mod.log:info("safari-plus: loaded (emerald safari overhaul)")
 end
