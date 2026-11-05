@@ -183,24 +183,26 @@ return function(mod)
         local idx = eligible(st.playerParty)
         if #idx == 0 then return end
         gainedSum, gainedCount, pendingSt = 0, 0, st
-        local awards = E.awardFoe(st, st.enemy, { trainer = false, partyIndices = idx })
-        if type(awards) == "table" then
-          local P = SP.require("src.core.game3.pokemon")
-          for _, entry in ipairs(awards) do
-            local r = entry and entry.result
-            if type(r) == "table" and type(r.levels) == "table"
-                and #r.levels > 0 and type(entry.mon) == "table" then
-              local lvls = {}
-              for _, lv in ipairs(r.levels) do lvls[#lvls + 1] = lv end
-              local nm = nil
-              if P and type(P.displayMonName) == "function" then
-                nm = P.displayMonName(entry.mon)
+        if SP.yieldPct() > 0 then
+          local awards = E.awardFoe(st, st.enemy, { trainer = false, partyIndices = idx })
+          if type(awards) == "table" then
+            local P = SP.require("src.core.game3.pokemon")
+            for _, entry in ipairs(awards) do
+              local r = entry and entry.result
+              if type(r) == "table" and type(r.levels) == "table"
+                  and #r.levels > 0 and type(entry.mon) == "table" then
+                local lvls = {}
+                for _, lv in ipairs(r.levels) do lvls[#lvls + 1] = lv end
+                local nm = nil
+                if P and type(P.displayMonName) == "function" then
+                  nm = P.displayMonName(entry.mon)
+                end
+                pendingBattleLearn = pendingBattleLearn or {}
+                pendingBattleLearn[#pendingBattleLearn + 1] =
+                  { mon = entry.mon, levels = lvls, name = nm }
+                pendingBattleEvo = pendingBattleEvo or {}
+                pendingBattleEvo[#pendingBattleEvo + 1] = entry.mon
               end
-              pendingBattleLearn = pendingBattleLearn or {}
-              pendingBattleLearn[#pendingBattleLearn + 1] =
-                { mon = entry.mon, levels = lvls, name = nm }
-              pendingBattleEvo = pendingBattleEvo or {}
-              pendingBattleEvo[#pendingBattleEvo + 1] = entry.mon
             end
           end
         end
@@ -234,12 +236,26 @@ return function(mod)
         local st = liveState()
         local pst = pendingSt
         pendingSt = nil
+        local statSuffix = nil
+        if type(SP.consumeStatLine) == "function" then
+          local okS, s = pcall(SP.consumeStatLine)
+          if okS and type(s) == "string" and s ~= "" then
+            statSuffix = s
+          end
+        end
         if st and st == pst and gainedCount > 0 and gainedSum > 0 then
-          nativePush("All your POKéMON gained "
+          local line = "All your POKéMON gained "
             .. tostring(math.floor(gainedSum / gainedCount))
-            .. " EXP. Points!", function()
+            .. " EXP. Points!"
+          if statSuffix then line = line .. " " .. statSuffix end
+          nativePush(line, function()
               drainBattleLearn(Ui)
             end)
+        elseif statSuffix then
+          pendingBattleLearn = nil
+          pendingBattleEvo = nil
+          unparkPhase(battleMod())
+          nativePush(statSuffix)
         else
           pendingBattleLearn = nil
           pendingBattleEvo = nil

@@ -3,6 +3,7 @@ return function(mod)
   if not SP then return end
   local CD = assert(SP.candyData)
   local pendingLearn = nil
+  local converted = false
   local function checkCandyEvolution(PM, mon, session, bag, done)
     local finish = SP.once(done)
     local target = nil
@@ -96,6 +97,18 @@ return function(mod)
     return true
   end
   local function useCandy(session, bag, def, item, slot, onArmed)
+    if type(def) == "table" and def.kind == "species"
+        and type(SP.speciesCandyUse) == "function" then
+      local _, iout = SP.try(SP.speciesCandyUse, session, bag, def,
+        item, slot)
+      if type(iout) == "table" then return iout end
+    end
+    if type(def) == "table" and def.evStat ~= nil
+        and type(SP.statCandyUse) == "function" then
+      local _, sout = SP.try(SP.statCandyUse, session, bag, def, item,
+        slot)
+      if type(sout) == "table" then return sout end
+    end
     if type(session) ~= "table" then
       session = SP.session()
     end
@@ -187,6 +200,19 @@ return function(mod)
     return true
   end
   local function convertRes(B, Ui, res, mon, rewards)
+    if SP.opt("partner", true) ~= false
+        and type(SP.isPartnerMon) == "function"
+        and SP.isPartnerMon(mon) then
+      local monName = (type(mon) == "table" and mon.name) or "POKéMON"
+      local Pokemon = SP.require("src.core.game3.pokemon")
+      if type(Pokemon) == "table"
+          and type(Pokemon.displayMonName) == "function" then
+        local ok, nm = pcall(Pokemon.displayMonName, mon)
+        if ok and type(nm) == "string" and nm ~= "" then monName = nm end
+      end
+      Ui.push(tostring(monName) .. " won't leave your side!")
+      return false
+    end
     local session = SP.session()
     if type(session) ~= "table" then return false end
     local Bag = SP.require("src.core.game3.bag")
@@ -195,9 +221,43 @@ return function(mod)
       return false
     end
     local bag = session.bag
+    if type(SP.takeSpeciesConvert) == "function" then
+      local _, extra = SP.try(SP.takeSpeciesConvert, mon)
+      if type(extra) == "table" and tonumber(extra.id) ~= nil then
+        rewards[#rewards + 1] = { id = extra.id,
+          qty = math.max(1, math.floor(tonumber(extra.qty) or 1)) }
+      end
+    end
     for _, r in ipairs(rewards) do
       local _, fits = SP.try(Bag.canAdd, bag, r.id, r.qty)
       if fits ~= true then return false end
+    end
+    if #rewards == 0 then
+      if res.pending then
+        res.pending = nil
+      else
+        local party = session.party
+        if type(party) == "table" then
+          for i = #party, 1, -1 do
+            if party[i] == mon then
+              table.remove(party, i)
+              break
+            end
+          end
+        end
+      end
+      local monName = (type(mon) == "table" and mon.name) or "POKéMON"
+      local Pokemon = SP.require("src.core.game3.pokemon")
+      if type(Pokemon) == "table"
+          and type(Pokemon.displayMonName) == "function" then
+        local ok, nm = pcall(Pokemon.displayMonName, mon)
+        if ok and type(nm) == "string" and nm ~= "" then monName = nm end
+      end
+      res.location = "party"
+      Ui.push("Released " .. tostring(monName) .. "!")
+      B._phase = "catch_pc_msg"
+      converted = true
+      return true
     end
     local droppedPending = false
     local droppedIndex = nil
@@ -230,19 +290,82 @@ return function(mod)
       return false
     end
     res.location = "party"
-    Ui.push("Converted into " .. CD.rewardText(rewards) .. "!")
+    Ui.push("You found " .. CD.rewardText(rewards) .. "!")
     B._phase = "catch_pc_msg"
+    converted = true
     return true
   end
   local function reset()
     pendingLearn = nil
   end
+  local function resetConvert()
+    converted = false
+  end
+  local function releasable(mon)
+    if type(mon) ~= "table" or mon.isEgg then return false end
+    if type(SP.isPartnerMon) == "function" then
+      local okP, p = pcall(SP.isPartnerMon, mon)
+      if okP and p then return false end
+    end
+    return true
+  end
+  local function releaseBundle(mon)
+    local extra = nil
+    if SP.opt("exp_candy", true) ~= false
+        and type(CD.rewardsFor) == "function"
+        and type(SP.cleanName) == "function"
+        and type(SP.isLegendary) == "function" then
+      local species = mon.species or mon.speciesId
+      local lvl = math.max(1, math.min(100,
+        math.floor(tonumber(mon.level) or 1)))
+      local okR, v = pcall(CD.rewardsFor, species,
+        SP.cleanName(mon, species), lvl, SP.isLegendary(species))
+      if okR and type(v) == "table" then extra = v end
+    end
+    return extra
+  end
+  local function wrapRelease()
+    local RS = SP.require("src.ui.game3.release_seq")
+    if type(RS) ~= "table" or type(RS.start) ~= "function" then
+      return false
+    end
+    if not SP.claim(RS, "__spReleaseCandyWrapped") then return true end
+    local native = RS.start
+    RS.start = function(opts)
+      if type(opts) == "table"
+          and type(opts.onComplete) == "function" then
+        local mon = opts.mon
+        local sess = opts.session
+        local cb = opts.onComplete
+        opts.onComplete = function(released)
+          pcall(function()
+            if released == true and releasable(mon)
+                and type(SP.awardOverworldCandy) == "function" then
+              pcall(SP.awardOverworldCandy,
+                type(sess) == "table" and sess or SP.session(),
+                mon, math.floor(tonumber(mon.level) or 1),
+                false, releaseBundle(mon), true)
+            end
+          end)
+          return cb(released)
+        end
+      end
+      return native(opts)
+    end
+    return true
+  end
+  local function wasConverted()
+    return converted
+  end
   SP.candyFlow = {
     useCandy = useCandy,
     convertRes = convertRes,
+    wasConverted = wasConverted,
+    resetConvert = resetConvert,
     wrapUse = wrapUse,
     wrapTarget = wrapTarget,
     wrapPartyMsg = wrapPartyMsg,
+    wrapRelease = wrapRelease,
     reset = reset,
   }
   mod.log:info("safari-plus: candy flow installed")

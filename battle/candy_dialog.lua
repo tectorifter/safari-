@@ -11,8 +11,52 @@ return function(mod)
     local native = ItemsData.info
     ItemsData.info = function(id, ...)
       if type(refresh) == "function" then refresh() end
+      local POUCH = CD.POUCH
+      if POUCH ~= nil and tonumber(id) == math.floor(tonumber(POUCH.id) or 0) then
+        return {
+          id = POUCH.id,
+          name = POUCH.name or "CANDY POUCH",
+          pocket = "ITEMS",
+          fieldUse = "pouch",
+          price = 0,
+          description = "Holds all your candies. Use to open it.",
+        }
+      end
       local def = SP.candyDef(id)
       if def then
+        if def.kind == "species" then
+          return {
+            id = def.id,
+            name = def.name,
+            pocket = "ITEMS",
+            fieldUse = "species_candy",
+            price = def.price or 500,
+            description = "A candy of the "
+              .. tostring(def.lineName or "same")
+              .. " line. Raises the lowest IV: 1 candy at 1-10,"
+              .. " 3 at 11-20, 5 at 21-30, 10 for 30-31.",
+          }
+        end
+        if def.evStat ~= nil then
+          local label = (CD.STAT_LABEL
+            and CD.STAT_LABEL[def.evStat]) or def.evStat:upper()
+          local win = type(def.size) == "string" and CD.STAT_WINDOW
+            and CD.STAT_WINDOW[def.size] or nil
+          local desc = "Gives +4 " .. tostring(label) .. " EVs."
+          if type(win) == "table" then
+            desc = desc .. " Works at "
+              .. tostring(math.floor(tonumber(win.lo) or 0)) .. "-"
+              .. tostring(math.floor(tonumber(win.hi) or 0)) .. " EVs."
+          end
+          return {
+            id = def.id,
+            name = def.name,
+            pocket = "ITEMS",
+            fieldUse = "stat_candy",
+            price = def.price or def.ev,
+            description = desc,
+          }
+        end
         return {
           id = def.id,
           name = def.name,
@@ -46,6 +90,13 @@ return function(mod)
     local nativeAsk = Ui.askYesNo
     Ui.askYesNo = function(a, b)
       if type(refresh) == "function" then refresh() end
+      -- The IV guard's own keep question passes through this (inner)
+      -- ask on its way out: show it untouched. Without this the
+      -- phase + catch-result check below hijacks it into a candy
+      -- exchange, consuming spCandyAsked before the guard resolves.
+      if SP.ivGuardAsking == true then
+        return nativeAsk(a, b)
+      end
       local cb = (type(a) == "function") and a or b
       local prompt = (type(a) == "string") and a or nil
       local divert = false
@@ -77,9 +128,17 @@ return function(mod)
       local caughtState = st
       local mon = res.mon
       local species = mon.species or mon.speciesId
-      local rewards = CD.rewardsFor(species, SP.cleanName(mon, species),
-        tonumber(mon.level) or 1, SP.isLegendary(species))
-      nativeAsk("You already have a copy of this POKéMON.\nExchange it for an EXP CANDY?",
+      local expOn = SP.opt("exp_candy", true) ~= false
+      local rewards = {}
+      if expOn then
+        rewards = CD.rewardsFor(species, SP.cleanName(mon, species),
+          tonumber(mon.level) or 1, SP.isLegendary(species))
+      end
+      local prompt = "You already have a copy of this POKéMON.\nRelease it?"
+      if expOn then
+        prompt = "You already have a copy of this POKéMON.\nExchange it for an EXP CANDY?"
+      end
+      nativeAsk(prompt,
         function(yes)
           if not B._active or B._st ~= caughtState
               or B._phase ~= "catch_nickname_prompt" then

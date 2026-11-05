@@ -38,6 +38,7 @@ return function(mod)
     ok = attempt("ask", function() return DG.wrapUi(FL.convertRes, ensureWraps) end) and ok
     ok = attempt("target", FL.wrapTarget) and ok
     ok = attempt("partymsg", FL.wrapPartyMsg) and ok
+    ok = attempt("release", FL.wrapRelease) and ok
     wrapsDone = ok
     return wrapsDone
   end
@@ -45,6 +46,7 @@ return function(mod)
   if mod.events and type(mod.events.on) == "function" then
     mod.events:on("battle.started", function()
       FL.reset()
+      FL.resetConvert()
       wrapsDone = false
       wrapFails = {}
       ensureWraps()
@@ -54,6 +56,11 @@ return function(mod)
     end)
     mod.events:on("map.entered", function()
       FL.reset()
+      FL.resetConvert()
+      pcall(function() attempt("release", FL.wrapRelease) end)
+    end)
+    mod.events:on("save.loaded", function()
+      pcall(function() attempt("release", FL.wrapRelease) end)
     end)
   end
   mod.log:info("safari-plus: duplicate catch candy exchange installed")

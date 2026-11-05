@@ -37,14 +37,12 @@
 - after the engine syncs each throw, the live stock is forced to the
 - battle counter, so the bag mirror can never drift from it. Both
 - installed at boot and retried on every `battle.started`.
-- `src.core.game3.safari.takeStep` (guard `Safari.__spTakeStepWrapped`):
-- wall-clock regen tick, then zone steps are skipped while on; calls
-- through otherwise.
-- `src.core.game3.bag.add` / `canAdd` (guards `Bag.__spAddWrapped` /
-- `Bag.__spCanAddWrapped`): upgrade ids (9001-9004) convert to levels,
-- never enter the bag. Single-level only (qty > 1 refused); at max
-- level the buy is refused, otherwise every confirm applies exactly
-- one level.
+- `src.core.game3.safari.takeStep`: intentionally NOT wrapped — zone
+- stepping runs fully native while the mod is on. Step XP arrives via
+- the `world.stepped` event instead.
+- The mart is vanilla stock: the mod installs no shop, bag, or item
+- seams there. Legacy purchased counts survive in the save only as the
+- one-time XP migration source.
 - `src.core.game3.bag.get` / `canAdd` / `add` / `remove` / `set` /
 - `listPocket` (guards `Bag.__spBall*Wrapped`): item id 5 (SAFARI
 - BALL) is virtual and mirrors the live stock, so the balls pocket
@@ -64,18 +62,47 @@
 - start. The four entrance-desk scripts (counter, try-enter,
 - no-case, exit-walk) are swallowed at the script runner with the
 - field unlocked, so with or without the POKéBLOCK CASE you walk
-- past the desk with no fee and no timed game.- `src.ui.game3.shop_menu.show` (guard `ShopMenu.__spShopWrapped`):- Oldale mart (`session.map == "EM_OLDALE_TOWN_MART"`) appends
-- non-maxed upgrade rows with dynamic prices; stock table is copied.
-- `src.ui.game3.rse.shop_menu.handleInput` (guard
-- `RseShop.__spQtyWrapped`): upgrade rows are clamped to qty 1
-- *before* the engine reads them (total reset to the single unit
-- price) with the old after-the-fact rescale kept as a safety net,
-- so a multiplied total can never reach a money check; the FRLG
-- `src.ui.game3.shop_menu.handleInput` (guard
-- `ShopMenu.__spUpgQtyWrapped`) clamps the same way. Both install
-- at boot and are retried on every shop open.
-- `ItemsData._byId` gains entries 9001-9004 (name/price/description).
-- `BagChrome._icons` pre-seeded blank for 9001-9004.
+- past the desk with no fee and no timed game.
+- `rules.safari.watchStep` (guard `RS.__spXpWatchWrapped`): a "watching"
+- reaction in our safari battles awards +6 Like XP.
+- `rules.safari.throwPokeblock` (guard `RS.__spXpBlockWrapped`):
+- throwing a POKéBLOCK in our safari battles awards +8 Like XP. Both
+- install at boot and retry on every `battle.started`.
+- `battle.ended`: an ended safari battle of ours awards +10 Regen XP.
+- `world.stepped`: a field step while below cap awards +1 Regen XP.
+- Overworld catch (`overworld/overworld_catch.lua`): with the
+- OVERWORLD toggle on, tapping an Untamed visible mon throws the
+- equipped ball at it — never a safari ball, no battle, nothing
+- spawned. `encounter.roll` returns nil only when Untamed itself
+- parks step battles; scripted/fishing/roamer and
+- Random-battles-ON rolls call through.
+ - OVERWORLD toggle on, tapping an Untamed visible mon throws the
+ - equipped ball at it — never a safari ball, no battle, nothing
+ - spawned, no fallback art. `encounter.roll` returns nil only when
+ - Untamed itself parks step battles; scripted/fishing/roamer and
+ - Random-battles-ON rolls call through. Targeting runs on an owned
+ - replica of Untamed's live actors (owned camera + world blit, so
+ - portrait hitboxes track the sprites).
+- The roll is `SP.customCatch` for the thrown real ball on the
+- actor's own species/level/personality/moves; catches despawn the
+- actor via `Owe.remove`. Rewards reuse `storeCaught` +
+- `SP.awardOverworldCandy` with automatic EXP-candy conversion and
+- manual party EXP/EVs. A safari equip reads as the first owned
+- real ball, and a throw with no owned real ball reports no stock
+- and throws nothing.
+- `shared.tick`: each ball granted by the wall-clock tick awards
+- +4 Regen XP. Levels derive from XP (highest threshold met in the
+- skill's cumulative table in `shared.XP_TABLE`, clamped to 60/30/70/30);
+- legacy purchased counts seed XP once at their level's threshold.
+- PLAYER LEVEL toggle (default ON): every safari skill gain also
+- pays 100x as GO-style trainer XP (levels 1-80, L80 203,353,000).
+- Catches pay 400 trainer XP (1000 new species, 1500 legendary),
+- wild-battle wins 400, trainers 500, gym leaders 1000, rivals
+- 1000, E4 and champion 2000 each, evolutions and hatches 1000,
+- item-ball pickups 350, max-raids den wins 6000. Den catches always
+- succeed (100%) while the mod is on. Item-ball drops unlock by trainer level
+- (great 14, evo 16, pinap 18, ultra 20, silver pinap 22, golden
+- razz 25). Level-ups toast overworld and show in the SAFARI menu.
 
 - `src.core.game3.battle.catching.storeCaught` (guard
 - `Catching.__spCatchExpWrapped`): on a safari catch, runs the engine's
@@ -83,7 +110,16 @@
 - as recipient, then queues a custom "All your POKéMON gained N EXP.
 - Points!" line, delivered after the Gotcha message. N is the
 - measured per-mon share actually distributed (EXP YIELD setting,
-- default 50%); at 0% no line is shown. Tutorials excluded.
+- default 50%); at 0% no line is shown. Tutorials excluded. Levels
+- gained queue the native battle move-learning flow
+- (`LearnMove.beginQueue` over each reached level, battle prompts),
+- chained off the summary line's dismissal, followed by the native
+- evolution scene per leveled mon (`Evolution.levelTarget` +
+- `EvolutionScene.start`, B-cancelable). While the queue runs the
+- battle is held on the awarding
+- phase (the only phase routing both Choice and summary input)
+- and restored after, since later catch phases would otherwise
+- show the prompts with dead input.
 - `exp.gain` hook: inside safari battles the per-mon award is scaled
 - by EXP YIELD (0-500%) relative to the defeated yield; other battles
 - pass through untouched.
@@ -125,20 +161,28 @@
 - `src.core.game3.battle.ui.askYesNo` (guard `Ui.__spCandyAskWrapped`):
 - the caught-mon nickname question is intercepted when the catch is a
 - duplicate (`CatchSeq.catchResult`, `firstTimeCaught == false`) while
-- the mod is on: it asks "You already have a copy of this POKéMON. /
-- Exchange it for an EXP CANDY?" first, reusing the
+- the mod is on: with EXP CANDY on it asks "You already have a copy
+- of this POKéMON. / Exchange it for an EXP CANDY?" first, with EXP
+- CANDY off it asks "You already have a copy of this POKéMON. /
+- Release it?" instead, reusing the
 - `catch_nickname_prompt` phase so choice input keeps working. No
 - falls back to the stock nickname prompt; Yes removes the caught mon
 - (party slot, or the deferred PC deposit which is then never made),
-- grants EXP CANDY items, pushes "Converted into ...!" and ends via
-- the stock `catch_pc_msg` pump. A full bag falls back to the nickname
-- prompt and keeps the mon. Tutorials, headless, and first-time catches
+- grants EXP CANDY items (none when EXP CANDY is off), pushes "You
+- found ...!" ("Released ...!" when nothing is granted) and ends via
+- the stock `catch_pc_msg` pump. A conversion counts as winning the
+- wild battle: the outgoing `done` result is mapped to `"win"` by
+- `SP.chainResult`, so the encounter chain keeps chaining. A full bag
+- falls back to the nickname prompt and keeps the mon. Tutorials, headless, and first-time catches
 - call through untouched. Installed at boot and retried on every
 - `battle.started`.
 - `ItemsData.info` (guard `ItemsData.__spCandyInfoWrapped`): ids
 - 9101-9105 report as EXP CANDY XS/S/M/L/XL (ITEMS pocket, "Gives N
-- Exp. Points."), so the stock bag stores and lists them with no pack
-- changes; all other ids call through.
+- Exp. Points."), ids 9121-9138 as `<STAT> CANDY <SIZE>` (ITEMS
+- pocket, "Gives N <STAT> EVs.", fieldUse `stat_candy`), and
+- 9500+ ids as `<Base> candy` (fieldUse `species_candy`), so the
+- stock bag stores and lists them with no pack changes; all other
+- ids call through.
 - `BagChrome.iconImage` (guard `BC.__spCandyIconWrapped`): candy ids
 - render with the Rare Candy icon (68), or a generated tier-colored
 - candy glyph when 68 has no cached art; all other ids call through.
@@ -152,8 +196,13 @@
 - uninstalled in the overworld.
 - `BagChrome.drawItemIcon` (guard `BC.__spCandyTintWrapped`): candy
 - icons draw tinted yellow (XS), green (S), deep blue (M), dark pink
-- (L), shiny red (XL), falling back to the stock draw without love;
-- all other ids call through. The Emerald RSE chrome
+- (L), shiny red (XL); stat candies draw their size's stripped gray
+- base sprite (S/L/XL art from the Health Candy sprites) tinted per
+- stat — HP yellow, ATTACK red, DEFENSE green, SP. ATK fuchsia,
+- SP. DEF purple, SPEED pink — falling back to the stock draw without
+- love; species candies draw the stripped green round base tinted
+- with the line's dominant sprite color. All other ids call through.
+- The Emerald RSE chrome
 - (`src.ui.game3.rse.bag_chrome`, a separate atlas-indexed module)
 - is wrapped too: candies draw the Rare Candy frame (68) tinted,
 - falling back to plain 68 without love.
@@ -161,9 +210,26 @@
 - `ItemUse.__spCandyUseWrapped`): using a candy from the party menu
 - applies its XP via `Experience.apply` (100/800/3000/10000/30000),
 - consumes one, and reports "gained N EXP. Points!" plus the new level.
-- Lv 100, fainted, and egg targets are refused; other items call
-- through. Move-learning and evolution on candy level-ups are not
-- queued yet.
+- Lv 100, fainted, and egg targets are refused for EXP candies; other
+- items call through. Stat candies (`<STAT> CANDY <SIZE>`, ids
+- 9121-9138) grant +4 EVs inside their size window (S below 100,
+- L 100-200, XL 200-252 of the stat's current EVs), capped at 252
+- per stat and 510 total (1512 total with this mod's own 1512 EVS
+- toggle ON, read live per use) with partial grants at window/cap
+- edges and no consume outside the window or when full,
+- recalculated via the native
+- `Pokemon.applyStats`; eggs refused, Lv 100 allowed. Species candies
+- (`<Base> candy`, ids 9500+national, e.g. "Bulbasaur candy") raise
+- every stat tied at the lowest IV by +1 on a mon of the same
+- evolution line — 1 candy at lowest 1-10, 3 at 11-20, 5 at 21-30,
+- 10 for 30-31 — refused with no consume off-line, all-perfect, or
+- short on the cost, also via `applyStats`. EXP-candy levels gained queue the native
+- move-learning flow
+- (`LearnMove.beginQueue` over `movesLearnedAt` for each reached
+- level, with the party menu's own message/yes-no/forget prompts),
+- then the native evolution scene (`Evolution.levelTarget` +
+- `EvolutionScene.start`, Rare-Candy-style, B-cancelable) for the
+- candy target if it can evolve at its new level.
 - Duplicate rewards by caught level (ties go to the higher tier):
 - 1-5: 1 XS; 6-8: 2 XS; 9-10: 3 XS; 11-15: 1 S; 16-20: 2 S;
 - 21-29: 3 S; 30-35: 1 M; 36-40: 1 M + 1 S; 41-45: 1 L; 46+: 1 L
@@ -174,16 +240,146 @@
 - Raikou, Entei, Suicune, Lugia, Ho-Oh, Celebi, Regirock, Regice,
 - Registeel, Latias, Latios, Kyogre, Groudon, Rayquaza, Jirachi,
 - Deoxys incl. forms) give 1 XL + 1 L.
+- Stat candy awards by caught level AND species (every successful
+- safari catch, kept or converted): size S for 1-18,
+- L for 19-36, XL for 37-100; a size roll per catch sets the qty per
+- stat in the caught species' runtime EV yield: 5% very small (0),
+- 80% normal (1), 10% above average (2), 5% giant (3) (dual-yield
+- species award that qty of each). No
+- pseudo/legendary exceptions. The award rides the post-catch message:
+- the size line leads ("You found a giant pokemon! Received ...!"),
+- appended to the "gained EXP" line, or on its own at 0% EXP YIELD
+- (a very-small roll shows its line alone); a full
+- bag skips the grant silently and never breaks the catch.
+- Species candy: with the EXP-candy conversion on a duplicate catch
+- only (kept duplicates grant none; the line's base already
+- seen, or the engine's `firstTimeCaught == false`), a guaranteed drop
+- of "<Base> candy" in the caught mon's size qty (id 9500 + base
+- meta persist so they rebuild after reboot). The tint is the base
+- species' dominant sprite color (most abundant opaque quantized
+- color from front sprite / sprite / icon module reads or the
+- content pokemon record, neutral gray if none); art is the stripped
+- green round base.
+- PC-storage releases pay the same bundle as a conversion (stat +
+- species per their toggles, EXP candy per its toggle; eggs and
+- partners pay nothing).
+- `src.core.game3.battle_bridge.start` (guard
+- `Bridge.__spMasteryWrapped`): wild, non-link, non-tutorial,
+- non-trainer foes with no preset IVs get a full random IV table with
+- mastery 31s applied (guaranteed picks, then 50% bonus picks,
+- swap-remove over non-31 stats), keyed by National Dex on the caught
+- species. Tiers: 5: 0+1, 15: 0+2, 30: 1+1, 50: 1+2, 75: 2+1,
+- 100: 2+2, 150: 2+3, 200: 2+4, 300: 3+3; counts cap at 300.
+- `src.core.game3.battle.catching.storeCaught` (guard
+- `Catching.__spMasteryWrapped`): a successful non-tutorial catch
+- increments that species' mastery counter and persists it.
+- `src.core.game3.battle.catching.storeCaught` (guard
+- `Catching.__spSafariXpWrapped`): a successful non-tutorial catch
+- awards Catch XP — `20 + (255 - rate) / 2` from the species catch
+- rate, ×5 on legendary repeats, ×30 on first-time legendary catches;
+- every catch also awards Cap XP from throwing efficiency (+8 first
+- ball, -1 per failed ball, floor +4, per-combat count) plus +8 more
+- on a first-time species catch.
+- `src.core.game3.battle.ui.askYesNo` (guard `Ui.__spIvGuardWrapped`,
+- outside the candy wrap): a duplicate catch with at least IV GUARD
+- perfect (31) IV stats asks to keep first (Yes keeps via the stock
+- nickname prompt, No falls through to the candy question); the keep
+- question itself raises SP.ivGuardAsking so the inner candy wrap
+- shows it untouched instead of hijacking it into an exchange. Per-stat
+- counts, never totals.
+- `src.core.game3.pokemon.applyStats` (guard
+- `Pokemon.__spPartnerWrapped`): a flagged partner mon (your first
+- gifted Torchic/Treecko/Mudkip-line mon, or the rival's matching
+- mons) gets +10 HP, +25 Attack, +10 Defense, +25 Sp. Atk, +10 Sp.
+- Def, +30 Speed to base before the native calculation runs, so
+- natures apply on top; current HP is topped up by the max-HP gain.
+- Unflagged mons and a PARTNER-off toggle call through untouched.
+- `ui.party.submenu`: the RELEASE row is stripped for a flagged
+- partner while PARTNER is on; other mons and toggle-off keep it.
+- `candy_flow.convertRes`: a flagged partner is refused with "<Name>
+- won't leave your side!" instead of being dropped (falls back to
+- the nickname prompt, conversion uncounted); unflagged mons pass.
+- Partner-move rows (home ids 355-366, relocated past dex-mod
+- moves when the dex mod is present) install into the live ROM
+- plus `Pokemon._moveNames` / `_romMoveNames` and `Moves.BY_NUM`
+- (each only when that table already exists, so a not-yet-built
+- engine pack is never clobbered; `Moves._numByName` only when
+- already built). Grassy Sprint's first-turn flinch, Tremor's
+- confusion, and the Leaf Gale / Frost Swamp stat drops run on
+- native effects (158/76/70/69), no custom code. Custom riders
+- run after hit through `gen3MoveEffects` (dual Attack/Sp. Atk
+- drop, team Reflect for 5 turns, self Speed, 15%-max-HP drain,
+- Leech Seed with grass/substitute/seeded fails, priority Protect
+- continuing the vanilla Protect fail streak). The
+- `battle.damage` wrap (`Damage.__spPartnerMovesWrapped`) reads
+- friendship power (`floor(10 * friendship / 25)`, min 1) unless
+- the call presets power, and applies Mudkip's Mud Force (+30%
+- Attack in rain). The `battle.resolveMove` wrap
+- (`Engine.__spPartnerMovesResolveWrapped`, singles only, never
+- on user-targeted moves) cures the Hydro Shield user's status
+- on a clean block. The `battle.accuracy` wrap always hits
+- friendship-power moves and fails Mud Traps unless the target's
+- planned turn action is a damaging move (fail-closed when the
+- plan is unknown).
+- `trainer.party`: rival-line rows learn the badge-allowed
+- partner moves of their own line (slots 1..N from live badge
+- flags, line ability set); Wally gains the third line's base
+- form (neither yours nor the rival's) at his top party level,
+- always parked last.
+- `world.talk` on Mom (Littleroot, gfx MOM / scriptKey MOM): greeting
+- with the player's name plus TUTOR / REST / CANCEL — Cancel closes
+- untouched, REST runs her usual event, TUTOR opens the ROM's
+- own Battle Frontier tutor screen (native kind-9 exchange menu
+- with SC prices, native description pane fed by the ROM tutor
+- bins extended with the partner line's moves). No mod-drawn
+- screen remains: prompts, warnings, price confirm and teaching
+- run through the native message box, yes/no choice, LearnMove
+- and summary screens. Locked/short/known picks warn with
+- have/need counts (badges 5/10/15/25 at 1/3/5/6 badges, any
+- species candy); the cost is taken only on success, and the
+- shop stays open for more teaching. PARTNER-off leaves her chat
+- vanilla, but already-taught moves keep working.
+- `world.talk` on item balls (map.json ITEM_BALL objects with
+- known scripts, 162 across the maps): the native finditem script
+- never runs, so the ball stays on the map. First pickup pays the
+- native item plus a random drop bundle; after a 5 min recharge the
+- ball turns colored again and pays only the bundle. Bundles roll
+- the shared drop table (balls, berries, all 13 evolution items,
+- random-species egg) with per-pickup caps (4 balls, 4 berries, 1
+- of each evo item, 1 egg). Drops unlock by trainer level (great
+- 14, evo 16, pinap 18, ultra 20, silver pinap 22, golden razz
+- 25); every granted pickup pays 350 trainer XP. Cooling balls
+- render gray; talking to
+- one early says it is empty.
+- `ItemsData.fieldUseKind` reports "evo" for the 12 native
+- evolution items plus the custom Linking Cord, so USE + party evolution
+- work on them; `Evolution.itemTarget` / `itemCheck` fall back to
+- trade-item rows and no-item trade rows (Linking Cord) when the
+- native data has no match. The native evolution
+- scene and consume path run, so cancel/nickname rules hold.
 
 ## Events
 
 - `battle.started`: regen tick, then freeze the regen clock.
+- Partner stamping: `pokemon.before_give` arms the gift,
+- `battle.started` / `map.entered` bond it, `save.loaded` adopts a
+- pre-existing starter-line mon; rival-line enemy mons stamp on
+- `battle.started`; `pokemon.evolved` and `mod.options_changed`
+- recalculate flagged mons.
+- Partner moves: `battle.started` syncs battler abilities to the
+- line (Intimidate / Lightning Rod / Mud Force);
+- `save.loaded` / `map.entered` backfill them on the party,
+- `pokemon.evolved` re-applies them. No new save keys: taught
+- moves live on the mons, tutoring spends species-candy items.
 - `battle.ended`: thaw the regen clock (battle time never accrues balls),
-- then write remaining safari balls back to the session stock.
+- then write remaining safari balls back to the session stock; an ended
+- safari battle of ours also awards +10 Regen XP.
+- `world.stepped`: a field step while below cap awards +1 Regen XP.
 
 ## Save data (persisted in the game save via `mod.save`)
 
-- `upg = { catch, like, regen, cap }` (counts, clamped to each line's max).
+- `upg = { catch, like, regen, cap }` (legacy purchased counts, kept
+- as the one-time XP migration source; never written by new code).
 - `balls` (stock, clamped 0 to the live BALL CAP level), `regenAt`
 - (host-clock stamp, reset if non-numeric or more than 120s in the future).
 - The live session mirrors the save and is synced on boot, on
@@ -191,3 +387,14 @@
 - is held), and on every mutation; a `0.5.0` migration scrubs
 - pre-existing buckets. Session-only data from older versions is
 - adopted into the save once if the bucket is empty.
+- `mastery` (sparse per-species catch counts keyed by National Dex,
+- each clamped 0-300, zero entries dropped).
+- `partnerAssigned` (once the first gifted partner-line mon is bonded).
+- `xp` (per-skill totals for catch/like/regen/cap, floored at 0).
+- `playerXp` (GO-style trainer XP, clamped 0 to 203,353,000).
+- Skill level is the highest XP threshold met (`shared.XP_TABLE`) —
+- clamped to the old maxes (60/30/70/30); legacy levels seed their
+- level's threshold once when the bucket is absent.
+- `itemBalls` (per-ball `{ taken, coolUntil, map, x, y }` keyed
+- `map#localId`; survives reload, so collected balls stay taken
+- and cooling balls finish recharging on the wall clock).

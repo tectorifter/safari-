@@ -111,6 +111,10 @@ return function(mod)
     end
     return nil, nil
   end
+  -- Overworld catch reuses the same counters/tiers at mon-gen time
+  -- (no battle state exists yet), so both are exported.
+  SP.masteryCount = getCount
+  SP.masteryTierFor = tierFor
   local function rollIVs()
     local iv1 = rng(65536)
     local iv2 = rng(65536)

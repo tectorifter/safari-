@@ -3,6 +3,18 @@ return function(mod)
   if not SP then return end
   local glyphImpl, isGlyphImpl
   local rseAtlasCache = nil
+  local function pouchId()
+    local CD = SP.candyData
+    local P = type(CD) == "table" and CD.POUCH or nil
+    return (type(P) == "table" and math.floor(tonumber(P.id) or 0)) or 9400
+  end
+  local function pouchTint()
+    local CD = SP.candyData
+    local P = type(CD) == "table" and CD.POUCH or nil
+    local t = type(P) == "table" and P.tint or nil
+    if type(t) == "table" then return t end
+    return { 0.85, 0.72, 0.5 }
+  end
   local function setTint(def)
     love.graphics.setColor(def.tint[1], def.tint[2], def.tint[3], 1)
   end
@@ -10,6 +22,31 @@ return function(mod)
     love.graphics.setColor(1, 1, 1, 1)
   end
   local function rseTinted(BC, def, x, y)
+    if def.kind == "species"
+        and type(SP.speciesCandyImage) == "function" then
+      local lv = love
+      if type(lv) == "table" and type(lv.graphics) == "table" then
+        local img = SP.speciesCandyImage()
+        if img ~= nil then
+          setTint(def)
+          lv.graphics.draw(img, x, y)
+          clearTint()
+          return true
+        end
+      end
+    end
+    if def.evStat ~= nil and type(SP.statCandyImage) == "function" then
+      local lv = love
+      if type(lv) == "table" and type(lv.graphics) == "table" then
+        local img = SP.statCandyImage(def.size)
+        if img ~= nil then
+          setTint(def)
+          lv.graphics.draw(img, x, y)
+          clearTint()
+          return true
+        end
+      end
+    end
     local lv = love
     if type(lv) ~= "table" or type(lv.graphics) ~= "table" then return false end
     if type(BC.manifest) ~= "function" then return false end
@@ -43,6 +80,20 @@ return function(mod)
     if not SP.claim(BC, "__spCandyTintWrapped") then return true end
     local native = BC.drawItemIcon
     BC.drawItemIcon = function(index, x, y, rotation, ox, oy)
+      if tonumber(index) == pouchId()
+          and type(SP.pouchImage) == "function" then
+        local lv = love
+        if type(lv) == "table" and type(lv.graphics) == "table" then
+          local img = SP.pouchImage()
+          if img ~= nil then
+            local t = pouchTint()
+            lv.graphics.setColor(t[1], t[2], t[3], 1)
+            lv.graphics.draw(img, x, y)
+            lv.graphics.setColor(1, 1, 1, 1)
+            return
+          end
+        end
+      end
       local def = SP.candyDef(index)
       if def == nil then
         return native(index, x, y, rotation, ox, oy)
@@ -58,8 +109,22 @@ return function(mod)
     if not SP.claim(BC, "__spCandyIconWrapped") then return true end
     local native = BC.iconImage
     BC.iconImage = function(itemId)
+      if tonumber(itemId) == pouchId()
+          and type(SP.pouchImage) == "function" then
+        local p = SP.pouchImage()
+        if p ~= nil then return p end
+      end
       local def = SP.candyDef(itemId)
       if def ~= nil then
+        if def.kind == "species"
+            and type(SP.speciesCandyImage) == "function" then
+          local spc = SP.speciesCandyImage()
+          if spc ~= nil then return spc end
+        end
+        if def.evStat ~= nil and type(SP.statCandyImage) == "function" then
+          local base = SP.statCandyImage(def.size)
+          if base ~= nil then return base end
+        end
         local base = native(68)
         if base ~= nil then return base end
         return glyphImpl(def)
@@ -76,6 +141,20 @@ return function(mod)
     if not SP.claim(BC, "__spCandyTintWrapped") then return true end
     local native = BC.drawItemIcon
     BC.drawItemIcon = function(itemId, px, py, scale)
+      if tonumber(itemId) == pouchId()
+          and type(SP.pouchImage) == "function" then
+        local img = SP.pouchImage()
+        local lv = love
+        if img ~= nil and type(lv) == "table"
+            and type(lv.graphics) == "table" then
+          local s = tonumber(scale) or 1
+          local t = pouchTint()
+          lv.graphics.setColor(t[1], t[2], t[3], 1)
+          lv.graphics.draw(img, px or 0, py or 0, 0, s, s)
+          lv.graphics.setColor(1, 1, 1, 1)
+          return true
+        end
+      end
       local def = SP.candyDef(itemId)
       if def == nil then
         return native(itemId, px, py, scale)

@@ -41,13 +41,16 @@ return {
   GAIN = {
     likeWatch = 6,
     likeBlock = 8,
+    likeFail = 2,
     regenStep = 1,
-    regenTick = 4,
     regenEnd = 10,
+    regenOwFail = 1,
+    regenOwCatch = 3,
     capFirst = 8,
     capFail = 1,
     capMin = 4,
     capNew = 8,
+    capOwCatch = 4,
     shinyCatch = 1000,
   },
   LEGENDS = {

@@ -1,7 +1,7 @@
 {
   "id": "safari-plus",
   "name": "safari-plus",
-  "version": "1.4.0",
+  "version": "2.2.3",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -15,7 +15,7 @@
     "engine_internals"
   ],
   "dependencies": [],
-  "optional_dependencies": [],
+  "optional_dependencies": ["untamed_advanced"],
   "description": "Emerald Safari overhaul: wild and fated encounters run safari mode.",
   "github": "https://github.com/tectorifter/safari-",
   "experimental": false,

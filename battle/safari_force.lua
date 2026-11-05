@@ -1,6 +1,7 @@
 return function(mod)
   local SP = mod.exports.safariPlus
   if not SP then return end
+  local chainWarned = {}
   -- Wild and fated encounters run on the native Safari scene (a copy
   -- of opts, so the caller's table never leaks safari mode into the
   -- next trainer battle). Tutorials, links and trainer parties pass
@@ -41,6 +42,7 @@ return function(mod)
     mod.events:on("battle.started", function()
       SP.tick()
       SP.freeze()
+      SP.chainFled = false
     end)
     mod.events:on("battle.ended", function(ev)
       SP.thaw()
@@ -56,6 +58,26 @@ return function(mod)
               s.safari.balls = math.max(0, math.min(SP.cap(), math.floor(left)))
             end
             SP.persist()
+          end
+        end
+        if type(b) == "table" and b.safari then
+          local reason = nil
+          local B = SP.require("src.core.game3.battle")
+          if B and type(B.getState) == "function" then
+            local ok, st = pcall(B.getState)
+            if ok and type(st) == "table" then reason = st.endReason end
+          end
+          if reason == nil then reason = b.endReason end
+          SP.chainSnap = reason
+          SP.chainFled = SP.isFleeReason(reason)
+          -- Diagnostic: an endReason outside the known win / caught /
+          -- flee / run / loss family passes through to the chain, so
+          -- log it once — it names the exact string to classify.
+          if type(reason) == "string" and not SP.isChainQuiet(reason)
+              and not chainWarned[reason] then
+            chainWarned[reason] = true
+            mod.log:warn("safari-plus: unrecognized safari endReason %s",
+              tostring(reason))
           end
         end
       end

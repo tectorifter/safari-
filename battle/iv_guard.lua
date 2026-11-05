@@ -4,7 +4,13 @@ return function(mod)
   -- Duplicate catches with at least IV GUARD perfect stats ask to keep
   -- first (Yes falls through to the stock nickname prompt, No to the
   -- candy question). Wraps outside the candy wrap so it sees the
-  -- nickname prompt first.
+  -- nickname prompt first. The keep question is asked through the
+  -- inner (candy-wrapped) ask, so SP.ivGuardAsking is raised while it
+  -- is up: the candy wrap keys off phase + catch-result state, not
+  -- prompt identity, and would otherwise hijack our own question
+  -- (candy exchange asked first, spCandyAsked consumed, and answering
+  -- No to Keep-it would land on the nickname prompt with conversion
+  -- unreachable).
   local IV_KEYS = { "hp", "atk", "def", "spe", "spa", "spd" }
   local function guardThreshold()
     local n = math.floor(tonumber(SP.opt("iv_guard", 3)) or 3)
@@ -81,9 +87,11 @@ return function(mod)
       local kept = res
       local mon = res.mon
       local n = count
+      SP.ivGuardAsking = true
       innerAsk(monName(mon) .. " has " .. tostring(n)
         .. (n == 1 and " perfect IV!" or " perfect IVs!")
         .. "\nKeep it?", function(yes)
+        SP.ivGuardAsking = false
         if not B._active then return end
         if yes then
           kept.spCandyAsked = true
